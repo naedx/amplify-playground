@@ -1,0 +1,11 @@
+query ListPost {
+  listPosts {
+    id
+    title
+    author {
+      id
+      firstName
+      lastName
+    }
+  }
+}
