@@ -8,6 +8,10 @@ This repository will explore different scenarios working with AWS Amplify especi
 
   - (Reusable) Explores configuring and using (NPM) @graphql-codegen/cli with an Amplify Gen2 application. #FlutterFriendly
 
+- projects/copy-lambda-module-helper
+
+  - (Resuable) Helper function to copy lambda code to the Amplify assets directory so that it can be packaged and uploaded.
+
 
 ## Contributions
 
