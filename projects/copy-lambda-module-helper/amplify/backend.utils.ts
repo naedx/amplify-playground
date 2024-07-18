@@ -184,6 +184,7 @@ const esbuildBuilding = (targetModule: string) => {
   );
   let buildResult = buildSync({
     platform: 'node',
+    bundle: true,
     outfile: tempFilePath,
     entryPoints: [targetModule],
   });
