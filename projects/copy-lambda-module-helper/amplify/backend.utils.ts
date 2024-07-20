@@ -9,7 +9,7 @@ import { execSync } from 'child_process';
 
 import fs from 'fs';
 import { ModuleKind, ScriptTarget, transpileModule } from 'typescript';
-import { buildSync } from 'esbuild';
+import { BuildOptions, buildSync } from 'esbuild';
 
 /**
  * This utility function is used to create a lambda Code object (aliased as LambdaCode) from a local file.
@@ -47,6 +47,7 @@ import { buildSync } from 'esbuild';
 
 interface AssetHelperConfig {
   transpiler: TranspilerOptions;
+  customEsBuild: CustomEsBuildOptions;
 }
 
 export enum TranspilerOptions {
@@ -55,9 +56,14 @@ export enum TranspilerOptions {
   Esbuild,
 }
 
+type CustomEsBuildOptions = {} | Partial<BuildOptions>;
+
 export function fromAssetHelper(
   targetModule: string,
-  config: AssetHelperConfig = { transpiler: TranspilerOptions.Off }
+  config: AssetHelperConfig = {
+    transpiler: TranspilerOptions.Off,
+    customEsBuild: {},
+  }
 ): LambdaCode {
   if (!fs.existsSync(targetModule)) {
     throw new Error(`The lambda source file does not exist: ${targetModule}`);
@@ -74,7 +80,7 @@ export function fromAssetHelper(
   }
   // if choosing ESbuild transpiler
   else if (config.transpiler === TranspilerOptions.Esbuild) {
-    sourceFilePath = esbuildBuilding(targetModule);
+    sourceFilePath = esbuildBuilding(targetModule, config.customEsBuild);
   }
 
   return LambdaCode.fromAsset(path.dirname(targetModule), {
@@ -174,7 +180,10 @@ const tsTranspiling = (targetModule: string) => {
   return tempFilePath;
 };
 
-const esbuildBuilding = (targetModule: string) => {
+const esbuildBuilding = (
+  targetModule: string,
+  customEsBuild: CustomEsBuildOptions
+) => {
   // tmp folder path
   let tmpPath = createTmpDir(targetModule);
   // compose the temporary file path and build this file
@@ -187,6 +196,7 @@ const esbuildBuilding = (targetModule: string) => {
     bundle: true,
     outfile: tempFilePath,
     entryPoints: [targetModule],
+    ...customEsBuild,
   });
   console.log('build result: ', buildResult);
   return tempFilePath;
