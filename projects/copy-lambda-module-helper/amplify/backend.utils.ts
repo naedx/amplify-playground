@@ -57,7 +57,7 @@ export enum TranspilerOptions {
 
 export function fromAssetHelper(
   targetModule: string,
-  config: AssetHelperConfig
+  config: AssetHelperConfig = { transpiler: TranspilerOptions.Off }
 ): LambdaCode {
   if (!fs.existsSync(targetModule)) {
     throw new Error(`The lambda source file does not exist: ${targetModule}`);
