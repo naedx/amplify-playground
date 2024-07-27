@@ -24,3 +24,119 @@ This is an example of how to setup @graphql-codegen/cli to work with an AWS Ampl
 
 - .vscode/tasks.json
   - This defines a task to automatically run the watch command (above).
+
+
+# Setup Walkthrough
+
+### Add builder to the project
+Copy the folder `builders/` and its contents from this package to your project.
+
+
+### Install pub packages
+Modify `pubspec.yaml` to include the following dependencies. (Note: You should probably upgrade the packages after):
+
+```yml
+  # ...
+
+  dependencies:
+    graphql_codegen: ^0.14.0
+    graphql_flutter: ^5.2.0-beta.6
+    freezed_annotation: ^2.4.1
+    
+  dev_dependencies:
+    build_runner:
+    freezed: ^2.5.2
+    json_serializable: ^6.7.1
+
+```
+
+
+### Configure the graphql_codegen plugin:
+Copy `build.yaml` from this project to your project root.
+
+
+### Add exceptions to the Dart analyzer:
+Configure the analyzer to ignore linting errors in the generated files. Modify `analysis_options.yaml` to include the following.
+
+```yml
+  analyzer:
+    plugins:
+      - custom_lint
+    exclude: 
+      - lib/api/amplify/**
+      - lib/models/amplify/**
+      - lib/data/models/**/*.freezed.dart
+      - lib/data/models/**/*.g.dart
+      - lib/data/models/**
+```
+
+
+### Add scripts to your `package.json`
+
+Update `package.json` to include the following scripts:
+
+```json
+  "scripts": {
+    "build:graphql-codegen": "graphql-codegen --config builders/graphql-codegen/graphql-codegen.config.ts",
+    "watch:graphql-codegen": "npm run build:graphql-codegen -- --watch",
+    "dart_buildrunner": "dart run build_runner watch --delete-conflicting-outputs",
+  }
+```
+
+
+### Create VSCode Task (Optional)
+Create or update `.vscode/tasks.json` to include 
+
+```json
+
+  {
+    "tasks": [
+      {
+        "type": "npm",
+        "script": "watch:graphql-codegen",
+        "path": "./",
+        "group": "build",
+        "problemMatcher": [],
+        "label": "watch:graphql-codegen",
+        "detail": "watch:graphql-codegen",
+        "runOptions": {
+          "runOn": "folderOpen"
+        },
+        "presentation": {
+          "reveal": "always",
+          "panel": "new"
+        }
+      },
+      {
+        "type": "npm",
+        "script": "dart_buildrunner",
+        "path": "./",
+        "group": "build",
+        "problemMatcher": [],
+        "label": "dart run build_runner watch",
+        "detail": "dart run build_runner watch",
+        "runOptions": {
+          "runOn": "folderOpen"
+        }
+      }
+    ]
+  }
+
+```
+
+
+### Define your schema:
+  - Note that at least one Query must be provided
+  - The system is configured to find schema definitions matching:    
+
+    `${__dirname}/schema/schema.graphql`,
+    `${__dirname}/features/**/schema.*.graphql`
+
+  - The system is configured to find documents at:
+
+    `${__dirname}/features/**/queries.*.graphql`
+    `${__dirname}/features/**/mutations.*.graphql`
+
+### Run the builders
+
+Launch the tasks using the VSCode tasks or via the CLI using the NPM scripts. END.
