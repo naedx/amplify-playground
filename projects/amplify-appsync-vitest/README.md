@@ -8,7 +8,7 @@ The `@aws-appsync/utils` library provides types but not implementations for comm
 ```ts 
 //...
 
-// mock the required functioins from @aws-appsync/utils
+// mock the required functions from @aws-appsync/utils
 vi.mock('@aws-appsync/utils', () => {
 
   const originalAppSyncUtils = require('@aws-appsync/utils');
