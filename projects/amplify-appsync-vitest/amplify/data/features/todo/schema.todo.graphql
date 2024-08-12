@@ -1,0 +1,17 @@
+# This "input" configures a global authorization rule to enable public access to
+# all models in this schema. Learn more about authorization rules here: https://docs.amplify.aws/react/build-a-backend/graphqlapi/customize-authorization-rules/
+input AMPLIFY {
+  globalAuthRule: AuthRule = { allow: public }
+} # FOR TESTING ONLY!
+
+type Todo
+  @auth(rules: [{allow: public}])
+  @model(queries: null, mutations: null, subscriptions: null)
+{
+  id: ID!
+  content: String
+}
+
+type Query {
+  getTodo(id: ID!): Todo @aws_api_key
+}

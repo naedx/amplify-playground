@@ -1,0 +1,5 @@
+query GetTodo($id: String!) {
+  getTodo($id) {
+    content
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "amplify-appsync-vitest",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "npx vitest"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "description": "",
+  "devDependencies": {
+    "@aws-amplify/backend": "^1.0.4",
+    "@aws-amplify/backend-cli": "^1.2.1",
+    "@aws-appsync/utils": "^1.8.0",
+    "@aws-sdk/util-dynamodb": "^3.629.0",
+    "aws-amplify": "^6.5.0",
+    "aws-cdk": "^2.150.0",
+    "aws-cdk-lib": "^2.150.0",
+    "aws-sdk": "^2.1673.0",
+    "constructs": "^10.3.0",
+    "esbuild": "^0.23.0",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4",
+    "uuid": "^10.0.0",
+    "vitest": "^2.0.4"
+  }
+}
