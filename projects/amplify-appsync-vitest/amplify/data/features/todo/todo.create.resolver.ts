@@ -1,12 +1,16 @@
 import { Context, util } from '@aws-appsync/utils';
 
 export function request(ctx: Context) {
-  const { id } = ctx.args;
+  const { content } = ctx.args.input;
+
+  const consolidatedValues = {
+    content
+  };
 
   return {
-    operation: "GetItem",
-    key: util.dynamodb.toMapValues({ id }),
-    consistentRead: false
+    operation: "PutItem",
+    key: util.dynamodb.toMapValues({ id: util.autoId() }),
+    attributeValues: util.dynamodb.toMapValues(consolidatedValues),
   }
 }
 
