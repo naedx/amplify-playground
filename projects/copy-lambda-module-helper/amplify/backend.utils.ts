@@ -5,11 +5,10 @@ import {
 } from 'aws-cdk-lib/aws-lambda';
 import path from 'path';
 
-import { execSync } from 'child_process';
 
+import { buildSync } from 'esbuild';
 import fs from 'fs';
 import { ModuleKind, ScriptTarget, transpileModule } from 'typescript';
-import { BuildOptions, buildSync } from 'esbuild';
 
 /**
  * This utility function is used to create a lambda Code object (aliased as LambdaCode) from a local file.
@@ -36,10 +35,10 @@ import { BuildOptions, buildSync } from 'esbuild';
  * The docker build mode:
  *     1. copies the file from the mapped input directory to the mapped output directory.
  *
- * @param targetModule - The path of the target file (.cjs/.js/.ts) as a string.
+ * @param sourceFilePath - The path of the target file (.cjs/.js/.ts) as a string.
  * @param config -  Configuration object for the asset helper.
  * @property {TranspilerOptions} transpiler - Specifies the transpiler option to use for the lambda source file.
- *  - `Off`: No transpiler is selected, meaning the source file has already been transpiled.
+ *  - `Off`: No transpiler is selected, meaning the source file is already JavaScript.
  *  - `Typescript`: the source file will be transpiled by TypeScript compiler.
  *  - `Esbuild`: the source file will be built by esbuild.
  * @returns A lambda Code object (aliased as LambdaCode)
@@ -47,7 +46,6 @@ import { BuildOptions, buildSync } from 'esbuild';
 
 interface AssetHelperConfig {
   transpiler: TranspilerOptions;
-  customEsBuild: CustomEsBuildOptions;
 }
 
 export enum TranspilerOptions {
@@ -56,83 +54,56 @@ export enum TranspilerOptions {
   Esbuild,
 }
 
-type CustomEsBuildOptions = {} | Partial<BuildOptions>;
-
 export function fromAssetHelper(
-  targetModule: string,
-  config: AssetHelperConfig = {
-    transpiler: TranspilerOptions.Off,
-    customEsBuild: {},
-  }
+  sourceFilePath: string,
+  config: AssetHelperConfig
 ): LambdaCode {
-  if (!fs.existsSync(targetModule)) {
-    throw new Error(`The lambda source file does not exist: ${targetModule}`);
-  }
-  let sourceFilePath: string;
-
-  // if the source file is already transpiled
-  if (config.transpiler === TranspilerOptions.Off) {
-    sourceFilePath = targetModule;
-  }
-  // if choosing Typescript transpiler
-  else if (config.transpiler === TranspilerOptions.Typescript) {
-    sourceFilePath = tsTranspiling(targetModule);
-  }
-  // if choosing ESbuild transpiler
-  else if (config.transpiler === TranspilerOptions.Esbuild) {
-    sourceFilePath = esbuildBuilding(targetModule, config.customEsBuild);
+  if (!fs.existsSync(sourceFilePath)) {
+    throw new Error(`The lambda source file does not exist: ${sourceFilePath}`);
   }
 
-  return LambdaCode.fromAsset(path.dirname(targetModule), {
+  return LambdaCode.fromAsset(path.dirname(sourceFilePath), {
     bundling: {
       image: LambdaRuntime.NODEJS_20_X.bundlingImage,
       command: [
         'node',
         '-e',
         `require('node:fs').copyFileSync("/asset-input/${path.basename(
-          targetModule
+          sourceFilePath
         )}", "/asset-output/index.cjs")`,
       ],
       local: {
         tryBundle(outputDir: string, options: BundlingOptions) {
           try {
-            // create directory if it doesn't exist then copy the file
-            const commandString = [
-              'node',
-              '-e',
-              `"`,
-              `if (! (require('node:fs').existsSync('${path.resolve(
-                outputDir
-              )}'))) { require('node:fs').mkdirSync('${path.resolve(
-                outputDir
-              )}'); }`,
-              `require('node:fs').copyFileSync('${sourceFilePath}', '${path.resolve(
-                outputDir
-              )}/index.cjs');`,
-              `"`,
-            ].join(' ');
 
-            execSync(commandString, { encoding: 'utf-8' });
+            console.log('Local build mode');
+            console.log('Writing to output directory: ', outputDir);
+
+            // create output directory if it doesn't yet exist
+            if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+
+            // if the source file is already js
+            if (config.transpiler === TranspilerOptions.Off) {
+              fs.copyFileSync(sourceFilePath, path.resolve(outputDir, 'index.js'));
+            }
+            // if choosing Typescript transpiler
+            else if (config.transpiler === TranspilerOptions.Typescript) {
+              tsTranspiling(sourceFilePath, outputDir);
+            }
+            // if choosing ESbuild transpiler
+            else if (config.transpiler === TranspilerOptions.Esbuild) {
+              esbuildBuilding(sourceFilePath, outputDir);
+            }
 
             return true;
           } catch (error) {
-            throw error;
-            //return false;  // return false instead to fallback to bundling with docker.
+            throw error; // throw an error to prevent falling back to the docker build mode
           }
         },
       },
     },
   });
 }
-
-const createTmpDir = (targetModule: string) => {
-  const rootPath = path.resolve(targetModule.split(/amplify\//)[0]);
-  // tmp folder path
-  const tmpPath = path.join(rootPath, 'tmp');
-  // Check if the tmp folder already exists
-  if (!fs.existsSync(tmpPath)) fs.mkdirSync(tmpPath);
-  return tmpPath;
-};
 
 const tsGetTranspiledCode = (targetModule: string) => {
   // Transpile the source ts code into js code
@@ -149,55 +120,49 @@ const tsGetTranspiledCode = (targetModule: string) => {
   }).outputText;
 };
 
-const tsCreateTranspiledFile = (
-  targetModule: string,
-  tmpPath: string,
-  transpiledCode: string
-) => {
-  // Create a temporary file for the transpiled code
-  const tempFilePath = path.join(
-    tmpPath,
-    path.basename(targetModule).replace('.ts', '.js')
-  );
-  fs.writeFileSync(tempFilePath, transpiledCode);
-  return tempFilePath;
-};
-
-const tsTranspiling = (targetModule: string) => {
-  // tmp folder path
-  let tmpPath = createTmpDir(targetModule);
+const tsTranspiling = (targetModule: string, outputDir: string) => {
 
   // Transpile the source ts code into js code
   const transpiledCode = tsGetTranspiledCode(targetModule);
 
-  // Create a temporary file for the transpiled code
-  const tempFilePath = tsCreateTranspiledFile(
-    targetModule,
-    tmpPath,
-    transpiledCode
+  // Write the transpiled file to the output directory
+  const outputFilePath = path.join(
+    outputDir,
+    'index.js' //path.basename(targetModule).replace('.ts', '.js')
   );
 
-  return tempFilePath;
+  fs.writeFileSync(outputFilePath, transpiledCode);
+
+  return outputFilePath;
 };
 
-const esbuildBuilding = (
-  targetModule: string,
-  customEsBuild: CustomEsBuildOptions
-) => {
-  // tmp folder path
-  let tmpPath = createTmpDir(targetModule);
-  // compose the temporary file path and build this file
-  let tempFilePath = path.join(
-    tmpPath,
-    path.basename(targetModule).replace('.ts', '.cjs')
+const esbuildBuilding = (targetModule: string, outputDir: string) => {
+
+  // Build the source file with esbuild and write it to the output directory
+  // as a CommonJS module
+
+  let outputFilePath = path.join(
+    outputDir,
+    'index.cjs' //path.basename(targetModule).replace('.ts', '.cjs')
   );
+
   let buildResult = buildSync({
     platform: 'node',
     bundle: true,
-    outfile: tempFilePath,
+    outfile: outputFilePath,
     entryPoints: [targetModule],
-    ...customEsBuild,
+    target: 'esnext',
+    format: 'cjs',
+    external: [
+      'aws-lambda',
+      '@aws-sdk/*'
+    ],
+    outExtension: {
+      '.js': '.cjs'
+    },
   });
+
   console.log('build result: ', buildResult);
-  return tempFilePath;
+
+  return outputFilePath;
 };

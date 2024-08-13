@@ -18,7 +18,8 @@ const stack = backend.createStack('MyCustomStack');
 const myLambda = new LambdaFunction(stack, 'MyCustomFunction', {
   handler: 'index.handler',
   code: fromAssetHelper(
-    path.resolve('amplify/functions/my-custom-function.lambda.cjs')
+    path.resolve('amplify/functions/my-custom-function.lambda.ts'),
+    { transpiler: TranspilerOptions.Esbuild }
   ),
   runtime: LambdaRuntime.NODEJS_20_X,
 });
