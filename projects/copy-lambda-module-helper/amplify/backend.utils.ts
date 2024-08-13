@@ -5,59 +5,41 @@ import {
 } from 'aws-cdk-lib/aws-lambda';
 import path from 'path';
 
-
-import { buildSync } from 'esbuild';
+import { buildSync, BuildOptions as ESBuildOptions } from 'esbuild';
 import fs from 'fs';
-import { ModuleKind, ScriptTarget, transpileModule } from 'typescript';
+import { ModuleKind, ScriptTarget, transpileModule, TranspileOptions as TSTranspileOptions } from 'typescript';
 
 /**
  * This utility function is used to create a lambda Code object (aliased as LambdaCode) from a local file.
- * It assumes that you have a watcher that transpiles your lambda to a .cjs. If you don't, you could
- * modify the code to include a transpilation step.
- *
- * UPDATE:
- * A transpilation step is added to the helper function.
- * A config object is added to the helper function, in which a 'transpiler' property is used to indicate
- * if the source file has already been transpiled or not. Specifically, if 'transpiler' is set to
- * 'TranspilerOptions.Off', then the source file is transpiled. But if 'transpiler' is set to 'TranspilerOptions.Typescript'
- * or 'TranspilerOptions.Esbuild', then the corresponding transpiler will be invoked, and
- * a temporary folder called "tmp" at the root of your project, which will store all the transpiled
- * files. And lastly, be sure to add this temporary folder to your .gitignore
- *
- * The local build mode:
- *     1. receives the path of the target file (.cjs/.js/.ts) as a string.
- *     2. receives as `outputDir` directory that where Amplify will expects to find your lambda code.
- *        This directory is under .amplify/artifacts/cdk-out/
- *     3. creates the directory if it doesn't yet exist and copies your target file to it.
- *     4. throws an Exception to prevent falling back to the docker build mode. This can be disabled by
- *        commenting out the throw statement and return false instead.
- *
- * The docker build mode:
- *     1. copies the file from the mapped input directory to the mapped output directory.
  *
  * @param sourceFilePath - The path of the target file (.cjs/.js/.ts) as a string.
- * @param config -  Configuration object for the asset helper.
- * @property {TranspilerOptions} transpiler - Specifies the transpiler option to use for the lambda source file.
- *  - `Off`: No transpiler is selected, meaning the source file is already JavaScript.
- *  - `Typescript`: the source file will be transpiled by TypeScript compiler.
- *  - `Esbuild`: the source file will be built by esbuild.
+ * @param {AssetHelperConfig} config -  Configuration object for the asset helper.
+ * @param {BuildMode} config.buildMode - The build mode to use for the lambda source file.
+ *  - `Off`: no transpiling is done and the file is copied as is to the output directory.
+ *  - `Typescript`: the source file will be transpiled by the TypeScript compiler.
+ *  - `Esbuild`: the source file will be built and bundled by esbuild.
+ * @param {BuildMode} config.ESBuildOptions - The build options for esbuild. Only used if buildMode is set to Esbuild.
+ * @param {BuildMode} config.TSTranspileOptions - The build options for TypeScript transpiler. Only used if buildMode is set to Typescript.
+ * 
  * @returns A lambda Code object (aliased as LambdaCode)
  */
 
-interface AssetHelperConfig {
-  transpiler: TranspilerOptions;
-}
-
-export enum TranspilerOptions {
-  Off,
-  Typescript,
-  Esbuild,
-}
-
-export function fromAssetHelper(
+export function lambdaCodeFromAssetHelper(
   sourceFilePath: string,
   config: AssetHelperConfig
 ): LambdaCode {
+
+  // The local build mode:
+  //     1. receives the path of the target file (.cjs/.js/.ts) as a string.
+  //     2. receives as `outputDir` directory that where Amplify will expects to find your lambda code.
+  //        This directory is under .amplify/artifacts/cdk-out/
+  //     3. creates the directory if it doesn't yet exist and copies your target file to it.
+  //     4. throws an Exception to prevent falling back to the docker build mode. This can be disabled by
+  //        commenting out the throw statement and returning false instead.
+  //
+  // The docker build mode (DISABLED. See above.): 
+  //     1. copies the file from the mapped input directory to the mapped output directory. 
+
   if (!fs.existsSync(sourceFilePath)) {
     throw new Error(`The lambda source file does not exist: ${sourceFilePath}`);
   }
@@ -83,16 +65,16 @@ export function fromAssetHelper(
             if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
 
             // if the source file is already js
-            if (config.transpiler === TranspilerOptions.Off) {
+            if (config.buildMode === BuildMode.Off) {
               fs.copyFileSync(sourceFilePath, path.resolve(outputDir, 'index.js'));
             }
             // if choosing Typescript transpiler
-            else if (config.transpiler === TranspilerOptions.Typescript) {
+            else if (config.buildMode === BuildMode.Typescript) {
               tsTranspiling(sourceFilePath, outputDir);
             }
             // if choosing ESbuild transpiler
-            else if (config.transpiler === TranspilerOptions.Esbuild) {
-              esbuildBuilding(sourceFilePath, outputDir);
+            else if (config.buildMode === BuildMode.Esbuild) {
+              esbuildBuilding(sourceFilePath, outputDir, config.esBuildOptions);
             }
 
             return true;
@@ -105,9 +87,25 @@ export function fromAssetHelper(
   });
 }
 
-const tsGetTranspiledCode = (targetModule: string) => {
+interface AssetHelperConfig {
+  buildMode: BuildMode;
+  esBuildOptions?: ESBuildOptions;
+  tsBuildOptions?: TSTranspileOptions;
+}
+
+export enum BuildMode {
+  Off,
+  Typescript,
+  Esbuild,
+}
+
+const tsGetTranspiledCode = (targetModule: string, tsTranspileOptions: TSTranspileOptions) => {
+
+  const { compilerOptions, ...otherOptions } = tsTranspileOptions;
+
   // Transpile the source ts code into js code
   const tsSourceCode = fs.readFileSync(targetModule, 'utf8');
+
   return transpileModule(tsSourceCode, {
     compilerOptions: {
       module: ModuleKind.CommonJS,
@@ -116,14 +114,16 @@ const tsGetTranspiledCode = (targetModule: string) => {
       forceConsistentCasingInFileNames: true,
       strict: true,
       skipLibCheck: true,
+      ...compilerOptions
     },
+    ...otherOptions
   }).outputText;
 };
 
-const tsTranspiling = (targetModule: string, outputDir: string) => {
+const tsTranspiling = (targetModule: string, outputDir: string, tsTranspileOptions: TSTranspileOptions = {}) => {
 
   // Transpile the source ts code into js code
-  const transpiledCode = tsGetTranspiledCode(targetModule);
+  const transpiledCode = tsGetTranspiledCode(targetModule, tsTranspileOptions);
 
   // Write the transpiled file to the output directory
   const outputFilePath = path.join(
@@ -136,7 +136,7 @@ const tsTranspiling = (targetModule: string, outputDir: string) => {
   return outputFilePath;
 };
 
-const esbuildBuilding = (targetModule: string, outputDir: string) => {
+const esbuildBuilding = (targetModule: string, outputDir: string, buildOptions: ESBuildOptions = {}) => {
 
   // Build the source file with esbuild and write it to the output directory
   // as a CommonJS module
@@ -160,9 +160,10 @@ const esbuildBuilding = (targetModule: string, outputDir: string) => {
     outExtension: {
       '.js': '.cjs'
     },
+    ...buildOptions
   });
 
-  console.log('build result: ', buildResult);
+  console.log('Build result: ', buildResult);
 
   return outputFilePath;
 };
