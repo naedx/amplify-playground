@@ -4,6 +4,8 @@ A helper to build, bundle and copy a lambda function to the Amplify assets direc
 
 ## Basic Usage 
 
+The example below defines an Amplify backend and builds and bundles the function `my-custom-function.lambda.ts` using esbuild.
+
 ```ts
 
 import { BuildMode, lambdaCodeFromAssetHelper } from '@amplify-playground/lambda-code-from-asset-helper';
@@ -35,7 +37,7 @@ const myLambda = new LambdaFunction(stack, 'MyCustomFunction', {
 
 ## Configuration
 
-Disable building and copy file as is.
+Disable building and copy file as is:
 
 ```ts 
 { 
