@@ -4,7 +4,7 @@ import {
   Runtime as LambdaRuntime,
 } from 'aws-cdk-lib/aws-lambda';
 import path from 'path';
-import { fromAssetHelper, TranspilerOptions } from './backend.utils';
+import { BuildMode, lambdaCodeFromAssetHelper } from './backend.utils';
 
 const backend = defineBackend({
   // auth,
@@ -17,8 +17,9 @@ const stack = backend.createStack('MyCustomStack');
 
 const myLambda = new LambdaFunction(stack, 'MyCustomFunction', {
   handler: 'index.handler',
-  code: fromAssetHelper(
-    path.resolve('amplify/functions/my-custom-function.lambda.cjs')
+  code: lambdaCodeFromAssetHelper(
+    path.resolve('amplify/functions/my-custom-function.lambda.ts'),
+    { buildMode: BuildMode.Esbuild }
   ),
   runtime: LambdaRuntime.NODEJS_20_X,
 });
