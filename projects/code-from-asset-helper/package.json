@@ -1,0 +1,51 @@
+{
+  "name": "@amplify-playground/code-from-asset-helper",
+  "version": "1.0.1",
+  "description": "A helper to build, bundle and copy a function to the Amplify assets directory.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/naedx/amplify-playground.git"
+  },
+  "files": [
+    "dist/index.d.ts",
+    "dist/index.js",
+    "dist/lib/backend.utils.d.ts",
+    "dist/lib/backend.utils.js"
+  ],
+  "keywords": [
+    "Amplify",
+    "Lambda",
+    "esbuild",
+    "typescript"
+  ],
+  "author": "naedx",
+  "contributors": [
+    "MyNameIsTakenOMG"
+  ],
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/naedx/amplify-playground/issues"
+  },
+  "homepage": "https://github.com/naedx/amplify-playground/tree/dev/projects/code-from-asset-helper#readme",
+  "scripts": {
+    "prepublish": "tsc",
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@aws-appsync/utils": "^1.9.0",
+    "@types/eslint": "^8.56.11",
+    "@types/node": "^20.14.15",
+    "@typescript-eslint/parser": "^8.1.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.0.5"
+  },
+  "peerDependencies": {
+    "@aws-appsync/eslint-plugin": "^1.6.0",
+    "aws-cdk-lib": "^2.147.1",
+    "esbuild": "^0.21.5",
+    "esbuild-plugin-eslint": "^0.3.12",
+    "eslint": "^8.57.0"
+  }
+}

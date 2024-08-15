@@ -17,6 +17,7 @@ import {
 import path from 'path';
 
 const backend = defineBackend({
+  //..
 });
 
 const stack = backend.createStack('MyCustomStack');
@@ -51,7 +52,7 @@ Transpile using the TypeScript transpiler:
 ```ts 
 { 
   buildMode: BuildMode.Typescript,
-  TSTranspileOptions: {} // Optional
+  tsTranspileOptions: {} // Optional
 }
 
 ```
@@ -61,7 +62,7 @@ Build and bundle using esbuild:
 ```ts 
 { 
   buildMode: BuildMode.Off,
-  ESBuildOptions: {} // Optional
+  esBuildOptions: {} // Optional
 }
 
 ```
