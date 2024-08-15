@@ -9,9 +9,23 @@ import { BuildOptions as ESBuildOptions } from 'esbuild';
 import fs from 'fs';
 
 describe('appsync builder', () => {
+
+  test('resolver should fail linting', async () => {
+
+    const sourceFilePath = path.resolve('./tests/create-report.fail.resolver.ts');
+
+    expect(async () => {
+      const lintResult = await esLinting(sourceFilePath);
+
+    }).rejects.toThrow('2 linting error(s)');
+
+  });
+
   test('esbuild should create output', async () => {
 
     const sourceFilePath = path.resolve('./tests/create-report.resolver.ts');
+
+    const outputDirectory = path.resolve(`./tests/built-assets/asset.${getRandomInt(10000, 99999)}`);
 
     esLinting(sourceFilePath);
 
@@ -33,7 +47,7 @@ describe('appsync builder', () => {
 
     const outFile = await esbuildBuilding(
       sourceFilePath,
-      path.resolve('./tests/built-assets/'),
+      outputDirectory,
       path.basename(sourceFilePath).replace('.ts', '.js'),
       esBuildOptions
     );
@@ -44,9 +58,8 @@ describe('appsync builder', () => {
 
     expect(assetCreated).toBe(true);
 
+  });
 
-
-  })
   // test('should create asset', () => {
   //   const result = appSyncCodeFromAssetHelper(path.resolve('./tests/create-report.resolver.ts'), {
   //     buildMode: BuildMode.Esbuild,
@@ -57,3 +70,9 @@ describe('appsync builder', () => {
   //   console.log(result);
   // });
 });
+
+function getRandomInt(min: number, max: number) {
+  const minCeiled = Math.ceil(min);
+  const maxFloored = Math.floor(max);
+  return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
+}

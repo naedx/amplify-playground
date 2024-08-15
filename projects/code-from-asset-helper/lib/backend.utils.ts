@@ -109,9 +109,9 @@ export async function fromAssetHelper(
 
   const code = codeType === 'lambda' ? LambdaCode : AppSyncCode;
 
-  // if (codeType === 'appsync') {
-  //   await esLinting(sourceFilePath);
-  // }
+  if (codeType === 'appsync') {
+    await esLinting(sourceFilePath);
+  }
 
   const asset = code.fromAsset(path.dirname(sourceFilePath), {
 
