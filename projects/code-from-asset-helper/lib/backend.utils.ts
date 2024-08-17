@@ -64,94 +64,10 @@ export async function lambdaCodeFromAssetHelper(
  */
 export async function appSyncCodeFromAssetHelper(
   sourceFilePath: string,
-  config: AppSyncAssetHelperConfig
+  config: AppSyncAssetHelperConfigNoBuild | AppSyncAssetHelperConfigTS | AppSyncAssetHelperConfigES
 ): Promise<AppSyncCode> {
 
-  // The local build mode:
-  //     1. receives the path of the target file (.cjs/.js/.ts) as a string.
-  //     2. receives as `outputDir` directory that where Amplify will expects to find your lambda code.
-  //        This directory is under .amplify/artifacts/cdk-out/
-  //     3. creates the directory if it doesn't yet exist and copies your target file to it.
-  //     4. throws an Exception to prevent falling back to the docker build mode. This can be disabled by
-  //        commenting out the throw statement and returning false instead.
-  //
-  // The docker build mode (DISABLED. See above.): 
-  //     1. copies the file from the mapped input directory to the mapped output directory. 
-
-  if (!fs.existsSync(sourceFilePath)) {
-    throw new Error(`The source file does not exist: ${sourceFilePath}`);
-  }
-
-  await esLinting(sourceFilePath, (config as AppSyncAssetHelperConfig).tsConfig);
-
-  const asset = AppSyncCode.fromAsset(path.dirname(sourceFilePath), {
-
-    bundling: {
-      image: LambdaRuntime.NODEJS_20_X.bundlingImage,
-      command: [
-        'node',
-        '-e',
-        `require('node:fs').copyFileSync("/asset-input/${path.basename(
-          sourceFilePath
-        )}", 
-        "/asset-output/index.cjs")`,
-      ],
-      outputType: BundlingOutput.SINGLE_FILE,
-      local: {
-        tryBundle(outputTarget: string) {
-          try {
-
-            const outfile = `${outputTarget}/index.js`;
-            const outputDir = path.dirname(outfile);
-
-            // create output directory if it doesn't yet exist
-            if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
-
-            // if the source file is already js
-            if (config.buildMode === BuildMode.Off) {
-              fs.copyFileSync(sourceFilePath, outfile);
-            }
-            // if choosing Typescript transpiler
-            else if (config.buildMode === BuildMode.Typescript) {
-              tsTranspiling(sourceFilePath, outfile);
-            }
-            // if choosing ESbuild transpiler
-            else if (config.buildMode === BuildMode.Esbuild) {
-
-              //AppSync function build
-              const esBuildOptions: ESBuildOptions = {
-                sourcemap: 'inline',
-                sourcesContent: false,
-                format: 'esm',
-                target: 'esnext',
-                platform: 'node',
-                external: [
-                  '@aws-appsync/utils',
-                  '@aws-sdk/client-s3',
-                  '@aws-sdk/s3-request-presigner',
-                ],
-                bundle: true,
-                ...config.esBuildOptions
-              };
-
-              esbuildBuilding({
-                targetModule: sourceFilePath,
-                outputFilePath: outfile,
-                buildOptions: esBuildOptions
-              });
-
-            }
-
-            return true;
-          } catch (error) {
-            throw error; // throw an error to prevent falling back to the docker build mode
-          }
-        },
-      },
-    },
-  });
-
-  return asset;
+  return await fromAssetHelper(sourceFilePath, config, 'appsync') as AppSyncCode;
 }
 
 /**
@@ -174,7 +90,7 @@ export async function appSyncCodeFromAssetHelper(
  */
 export async function fromAssetHelper(
   sourceFilePath: string,
-  config: AssetHelperConfig | AppSyncAssetHelperConfig,
+  config: AssetHelperConfig | AppSyncAssetHelperConfigBase,
   codeType: 'lambda' | 'appsync'
 ): Promise<AppSyncCode | LambdaCode> {
 
@@ -196,11 +112,11 @@ export async function fromAssetHelper(
   const code = codeType === 'lambda' ? LambdaCode : AppSyncCode;
 
   if (codeType === 'appsync') {
-    await esLinting(sourceFilePath, (config as AppSyncAssetHelperConfig).tsConfig);
+    //perform linting if the code is for AppSync
+    await esLinting(sourceFilePath, (config as AppSyncAssetHelperConfigBase).tsConfig);
   }
 
   const asset = code.fromAsset(path.dirname(sourceFilePath), {
-
     bundling: {
       image: LambdaRuntime.NODEJS_20_X.bundlingImage,
       command: [
@@ -211,6 +127,7 @@ export async function fromAssetHelper(
         )}", 
         "/asset-output/index.cjs")`,
       ],
+      outputType: codeType === 'appsync' ? BundlingOutput.SINGLE_FILE : undefined,
       local: {
         tryBundle(outputDir: string, options: BundlingOptions) {
           try {
@@ -218,63 +135,70 @@ export async function fromAssetHelper(
             // create output directory if it doesn't yet exist
             if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
 
-            // if the source file is already js
-            if (config.buildMode === BuildMode.Off) {
-              fs.copyFileSync(sourceFilePath, path.resolve(outputDir, 'index.js'));
-            }
-            // if choosing Typescript transpiler
-            else if (config.buildMode === BuildMode.Typescript) {
-              tsTranspiling(sourceFilePath, path.resolve(outputDir, 'index.js'));
-            }
-            // if choosing ESbuild transpiler
-            else if (config.buildMode === BuildMode.Esbuild) {
+            switch (config.buildMode) {
+              case BuildMode.Off:
+                // if the source file is already js
+                fs.copyFileSync(sourceFilePath, path.join(outputDir, 'index.js'));
+                break;
+              case BuildMode.Typescript:
+                // if choosing Typescript transpiler
+                tsTranspiling(sourceFilePath, path.join(outputDir, 'index.js'));
+                break;
+              case BuildMode.Esbuild:
+                // if choosing ESbuild transpiler
+                const esConfig = config as AppSyncAssetHelperConfigES;
 
-              if (codeType === 'lambda') {
                 //lambda build
-                const esBuildOptions: ESBuildOptions = {
+                const commonOptions: ESBuildOptions = {
                   platform: 'node',
                   bundle: true,
                   target: 'esnext',
-                  format: 'cjs',
-                  external: [
-                    'aws-lambda',
-                    '@aws-sdk/*'
-                  ],
-                  outExtension: {
-                    '.js': '.cjs'
-                  },
-                  ...config.esBuildOptions
                 };
 
-                esbuildBuilding({
-                  targetModule: sourceFilePath,
-                  outputFilePath: path.join(`${outputDir}/index.cjs`),
-                  buildOptions: esBuildOptions
-                });
-              }
-              else {
-                //AppSync function build
-                const esBuildOptions: ESBuildOptions = {
-                  sourcemap: 'inline',
-                  sourcesContent: false,
-                  format: 'esm',
-                  target: 'esnext',
-                  platform: 'node',
-                  external: [
-                    '@aws-appsync/utils',
-                    '@aws-sdk/client-s3',
-                    '@aws-sdk/s3-request-presigner',
-                  ],
-                  bundle: true,
-                  ...config.esBuildOptions
-                };
+                switch (codeType) {
+                  case 'lambda':
+                    esbuildBuilding({
+                      sourceFilePath: sourceFilePath,
+                      outputFilePath: path.join(outputDir, 'index.cjs'),
+                      buildOptions: {
+                        ...commonOptions,
+                        format: 'cjs',
+                        external: [
+                          'aws-lambda',
+                          '@aws-sdk/*'
+                        ],
+                        outExtension: {
+                          '.js': '.cjs'
+                        },
+                        ...esConfig.esBuildOptions // apply user defined overrides
+                      }
+                    });
+                    break;
 
-                esbuildBuilding({
-                  targetModule: sourceFilePath,
-                  outputFilePath: path.join(`${outputDir}/index.js`),
-                  buildOptions: esBuildOptions
-                });
-              }
+                  case 'appsync':
+                    esbuildBuilding({
+                      sourceFilePath: sourceFilePath,
+                      outputFilePath: path.join(outputDir, 'index.js'),
+                      buildOptions: {
+                        ...commonOptions,
+                        format: 'esm',
+                        external: [
+                          '@aws-appsync/utils',
+                          '@aws-sdk/client-s3',
+                          '@aws-sdk/s3-request-presigner',
+                        ],
+                        ...esConfig.esBuildOptions // apply user defined overrides
+                      }
+                    });
+                    break;
+
+                  default:
+                    throw new Error(`Invalid code type: ${codeType}`);
+                }
+
+                break;
+              default:
+                throw new Error(`Invalid build mode: ${config.buildMode}`);
             }
 
             return true;
@@ -295,11 +219,27 @@ export interface AssetHelperConfig {
   tsTranspileOptions?: TSTranspileOptions;
 }
 
-export interface AppSyncAssetHelperConfig {
-  buildMode: BuildMode;
+interface AppSyncAssetHelperConfigBase extends AssetHelperConfig {
+  buildMode: BuildMode
   tsConfig: string; // path to tsconfig.json to be used for linting
-  esBuildOptions?: ESBuildOptions;
+}
+
+export interface AppSyncAssetHelperConfigNoBuild extends AppSyncAssetHelperConfigBase {
+  buildMode: BuildMode.Off;
+  tsTranspileOptions?: undefined;
+  esBuildOptions?: undefined;
+}
+
+export interface AppSyncAssetHelperConfigTS extends AppSyncAssetHelperConfigBase {
+  buildMode: BuildMode.Typescript;
   tsTranspileOptions?: TSTranspileOptions;
+  esBuildOptions?: undefined;
+}
+
+export interface AppSyncAssetHelperConfigES extends AppSyncAssetHelperConfigBase {
+  buildMode: BuildMode.Esbuild;
+  tsTranspileOptions?: undefined;
+  esBuildOptions?: ESBuildOptions;
 }
 
 export enum BuildMode {
@@ -308,14 +248,18 @@ export enum BuildMode {
   Esbuild,
 }
 
-const tsGetTranspiledCode = (targetModule: string, tsTranspileOptions: TSTranspileOptions) => {
+const tsGetTranspiledCode = (sourceFilePath: string, tsTranspileOptions: TSTranspileOptions) => {
 
   const { compilerOptions, ...otherOptions } = tsTranspileOptions;
 
-  // Transpile the source ts code into js code
-  const tsSourceCode = fs.readFileSync(targetModule, 'utf8');
+  console.log('Transpiling with TypeScript sourceFilePath:', sourceFilePath);
 
-  return transpileModule(tsSourceCode, {
+  // Transpile the source ts code into js code
+  const tsSourceCode = fs.readFileSync(sourceFilePath, 'utf8');
+
+  console.log('Transpiling with TypeScript:', tsSourceCode);
+
+  const result = transpileModule(tsSourceCode, {
     compilerOptions: {
       module: ModuleKind.CommonJS,
       target: ScriptTarget.ES2020,
@@ -326,22 +270,31 @@ const tsGetTranspiledCode = (targetModule: string, tsTranspileOptions: TSTranspi
       ...compilerOptions
     },
     ...otherOptions
-  }).outputText;
+  });
+
+  console.log('Transpiling with TypeScript diagnostics:', result.diagnostics, result.outputText);
+
+  return result.outputText;
 };
 
-const tsTranspiling = (targetModule: string, outputFilePath: string, tsTranspileOptions: TSTranspileOptions = {}) => {
+export const tsTranspiling = (sourceFilePath: string, outputFilePath: string, tsTranspileOptions: TSTranspileOptions = {}) => {
 
   // Transpile the source ts code into js code
-  const transpiledCode = tsGetTranspiledCode(targetModule, tsTranspileOptions);
+  const transpiledCode = tsGetTranspiledCode(sourceFilePath, tsTranspileOptions);
 
   // Write the transpiled file to the output directory
   fs.writeFileSync(outputFilePath, transpiledCode);
+
+  console.log('Transpiling with TypeScript:', {
+    source: sourceFilePath,
+    output: outputFilePath
+  });
 
   return outputFilePath;
 };
 
 export const esbuildBuilding = (options: {
-  targetModule: string,
+  sourceFilePath: string,
   outputFilePath: string,
   buildOptions?: ESBuildOptions
 }) => {
@@ -351,12 +304,12 @@ export const esbuildBuilding = (options: {
 
   let buildResult = buildSync({
     outfile: options.outputFilePath,
-    entryPoints: [options.targetModule],
+    entryPoints: [options.sourceFilePath],
     ...options.buildOptions
   });
 
   console.log('Building with esbuild:', {
-    source: options.targetModule,
+    source: options.sourceFilePath,
     output: options.outputFilePath,
     buildErrors: buildResult.errors,
     buildWarnings: buildResult.warnings
