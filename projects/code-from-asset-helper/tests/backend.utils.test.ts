@@ -2,7 +2,7 @@
 
 import path from 'path';
 import { describe, expect, test } from 'vitest';
-import { esbuildBuilding, esLinting } from '../lib/backend.utils';
+import { esbuildBuilding, esLinting, tsTranspiling } from '../lib/backend.utils';
 
 import { BuildOptions as ESBuildOptions } from 'esbuild';
 
@@ -46,7 +46,7 @@ describe('appsync builder', () => {
     };
 
     const outFile = await esbuildBuilding({
-      targetModule: sourceFilePath,
+      sourceFilePath,
       outputFilePath: path.join(outputDir, path.basename(sourceFilePath).replace('.ts', '.js')),
       buildOptions: esBuildOptions
     });
@@ -59,9 +59,30 @@ describe('appsync builder', () => {
 
   });
 
-  // test('should create asset', () => {
-  //   const result = appSyncCodeFromAssetHelper(path.resolve('./tests/create-report.resolver.ts'), {
-  //     buildMode: BuildMode.Esbuild,
+  test('tsTranspiling should create output', async () => {
+
+    const sourceFilePath = path.resolve('./tests/create-report.resolver.ts');
+
+    const outputDir = path.resolve(`./tests/built-assets/asset.${getRandomInt(10000, 99999)}`);
+
+    if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+
+    esLinting(sourceFilePath, path.resolve('./tests/tsconfig.json'));
+
+    const outFile = tsTranspiling(sourceFilePath, path.join(outputDir, path.basename(sourceFilePath).replace('.ts', '.js')))
+
+    expect(outFile).not.toBeNull();
+
+    const assetCreated = fs.existsSync(outFile);
+
+    expect(assetCreated).toBe(true);
+
+  });
+
+  // test('should create asset', async () => {
+  //   const result = await appSyncCodeFromAssetHelper(path.resolve('./tests/create-report.resolver.ts'), {
+  //     buildMode: BuildMode.Off,
+  //     tsConfig: path.resolve('./tests/tsconfig.json')
   //   });
 
   //   expect(result).not.toBeNull();
@@ -75,3 +96,4 @@ function getRandomInt(min: number, max: number) {
   const maxFloored = Math.floor(max);
   return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
 }
+
