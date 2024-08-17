@@ -57,12 +57,14 @@ export async function lambdaCodeFromAssetHelper(
  * @param {BuildMode} config.esBuildOptions - The build options for esbuild. Only used if buildMode is set to Esbuild.
  * 
  * @param {BuildMode} config.tsTranspileOptions - The build options for TypeScript transpiler. Only used if buildMode is set to Typescript.
+ *
+ * @param {BuildMode} config.tsConfig - (Required) The tsconfig.json file to use for esLinting. This is required even if buildMode is set to Off.
  * 
  * @returns An AppSync Code object (aliased as AppSyncCode)
  */
 export async function appSyncCodeFromAssetHelper(
   sourceFilePath: string,
-  config: AssetHelperConfig
+  config: AppSyncAssetHelperConfig
 ): Promise<AppSyncCode> {
 
   return await fromAssetHelper(sourceFilePath, config, 'appsync') as AppSyncCode;
@@ -88,7 +90,7 @@ export async function appSyncCodeFromAssetHelper(
  */
 export async function fromAssetHelper(
   sourceFilePath: string,
-  config: AssetHelperConfig,
+  config: AssetHelperConfig | AppSyncAssetHelperConfig,
   codeType: 'lambda' | 'appsync'
 ): Promise<AppSyncCode | LambdaCode> {
 
@@ -110,7 +112,7 @@ export async function fromAssetHelper(
   const code = codeType === 'lambda' ? LambdaCode : AppSyncCode;
 
   if (codeType === 'appsync') {
-    await esLinting(sourceFilePath);
+    await esLinting(sourceFilePath, (config as AppSyncAssetHelperConfig).tsConfig);
   }
 
   const asset = code.fromAsset(path.dirname(sourceFilePath), {
@@ -211,6 +213,13 @@ export interface AssetHelperConfig {
   tsTranspileOptions?: TSTranspileOptions;
 }
 
+export interface AppSyncAssetHelperConfig {
+  buildMode: BuildMode;
+  tsConfig: string; // path to tsconfig.json to be used for linting
+  esBuildOptions?: ESBuildOptions;
+  tsTranspileOptions?: TSTranspileOptions;
+}
+
 export enum BuildMode {
   Off,
   Typescript,
@@ -280,12 +289,12 @@ export const esbuildBuilding = (targetModule: string, outputDir: string, outputF
   return outfile;
 };
 
-export const esLinting = async (sourceFilePath: string) => {
+export const esLinting = async (sourceFilePath: string, tsConfig: string) => {
   const eslint = new ESLint({
     baseConfig: appSyncESlintPlugin.configs?.recommended as Linter.Config,
     overrideConfig: {
       parserOptions: {
-        project: './tsconfig.json'
+        project: tsConfig
       }
     },
   });
@@ -293,10 +302,21 @@ export const esLinting = async (sourceFilePath: string) => {
   const lintResults = (await eslint.lintFiles([sourceFilePath]))[0];
 
   if (lintResults.errorCount > 0) {
-    const messages = [...lintResults.messages, ...lintResults.suppressedMessages];
+
+    const messages = [...lintResults.messages, ...lintResults.suppressedMessages].map(m => {
+      if (m.ruleId !== null) {
+        return m.ruleId;
+      }
+      else if (m.fatal) {
+        return `Fatal error: ${m.message}`;
+      }
+      else {
+        return `Error: ${m.message}`;
+      }
+    });
 
     console.error(`${lintResults.errorCount} linting error(s)::`, messages);
-    throw new Error(`${lintResults.errorCount} linting error(s) found:: ${messages.map(m => m.ruleId).join(', ')}`);
+    throw new Error(`${lintResults.errorCount} linting error(s) found:: ${messages.join(', ')}`);
   }
 
   return true;

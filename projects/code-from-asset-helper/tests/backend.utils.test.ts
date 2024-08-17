@@ -15,7 +15,7 @@ describe('appsync builder', () => {
     const sourceFilePath = path.resolve('./tests/create-report.fail.resolver.ts');
 
     expect(async () => {
-      const lintResult = await esLinting(sourceFilePath);
+      const lintResult = await esLinting(sourceFilePath, path.resolve('./tests/tsconfig.json'));
 
     }).rejects.toThrow('2 linting error(s)');
 
@@ -27,7 +27,7 @@ describe('appsync builder', () => {
 
     const outputDirectory = path.resolve(`./tests/built-assets/asset.${getRandomInt(10000, 99999)}`);
 
-    esLinting(sourceFilePath);
+    esLinting(sourceFilePath, path.resolve('./tests/tsconfig.json'));
 
     //AppSync function build
     const esBuildOptions: ESBuildOptions = {
