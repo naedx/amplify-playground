@@ -1,4 +1,4 @@
-import { BundlingOptions } from 'aws-cdk-lib';
+import { BundlingOptions, BundlingOutput } from 'aws-cdk-lib';
 
 import {
   Code as LambdaCode,
@@ -67,7 +67,91 @@ export async function appSyncCodeFromAssetHelper(
   config: AppSyncAssetHelperConfig
 ): Promise<AppSyncCode> {
 
-  return await fromAssetHelper(sourceFilePath, config, 'appsync') as AppSyncCode;
+  // The local build mode:
+  //     1. receives the path of the target file (.cjs/.js/.ts) as a string.
+  //     2. receives as `outputDir` directory that where Amplify will expects to find your lambda code.
+  //        This directory is under .amplify/artifacts/cdk-out/
+  //     3. creates the directory if it doesn't yet exist and copies your target file to it.
+  //     4. throws an Exception to prevent falling back to the docker build mode. This can be disabled by
+  //        commenting out the throw statement and returning false instead.
+  //
+  // The docker build mode (DISABLED. See above.): 
+  //     1. copies the file from the mapped input directory to the mapped output directory. 
+
+  if (!fs.existsSync(sourceFilePath)) {
+    throw new Error(`The source file does not exist: ${sourceFilePath}`);
+  }
+
+  await esLinting(sourceFilePath, (config as AppSyncAssetHelperConfig).tsConfig);
+
+  const asset = AppSyncCode.fromAsset(path.dirname(sourceFilePath), {
+
+    bundling: {
+      image: LambdaRuntime.NODEJS_20_X.bundlingImage,
+      command: [
+        'node',
+        '-e',
+        `require('node:fs').copyFileSync("/asset-input/${path.basename(
+          sourceFilePath
+        )}", 
+        "/asset-output/index.cjs")`,
+      ],
+      outputType: BundlingOutput.SINGLE_FILE,
+      local: {
+        tryBundle(outputTarget: string) {
+          try {
+
+            const outfile = `${outputTarget}/index.js`;
+            const outputDir = path.dirname(outfile);
+
+            // create output directory if it doesn't yet exist
+            if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+
+            // if the source file is already js
+            if (config.buildMode === BuildMode.Off) {
+              fs.copyFileSync(sourceFilePath, outfile);
+            }
+            // if choosing Typescript transpiler
+            else if (config.buildMode === BuildMode.Typescript) {
+              tsTranspiling(sourceFilePath, outfile);
+            }
+            // if choosing ESbuild transpiler
+            else if (config.buildMode === BuildMode.Esbuild) {
+
+              //AppSync function build
+              const esBuildOptions: ESBuildOptions = {
+                sourcemap: 'inline',
+                sourcesContent: false,
+                format: 'esm',
+                target: 'esnext',
+                platform: 'node',
+                external: [
+                  '@aws-appsync/utils',
+                  '@aws-sdk/client-s3',
+                  '@aws-sdk/s3-request-presigner',
+                ],
+                bundle: true,
+                ...config.esBuildOptions
+              };
+
+              esbuildBuilding({
+                targetModule: sourceFilePath,
+                outputFilePath: outfile,
+                buildOptions: esBuildOptions
+              });
+
+            }
+
+            return true;
+          } catch (error) {
+            throw error; // throw an error to prevent falling back to the docker build mode
+          }
+        },
+      },
+    },
+  });
+
+  return asset;
 }
 
 /**
@@ -124,14 +208,12 @@ export async function fromAssetHelper(
         '-e',
         `require('node:fs').copyFileSync("/asset-input/${path.basename(
           sourceFilePath
-        )}", "/asset-output/index.cjs")`,
+        )}", 
+        "/asset-output/index.cjs")`,
       ],
       local: {
         tryBundle(outputDir: string, options: BundlingOptions) {
           try {
-
-            console.log('Local build mode');
-            console.log('Writing to output directory: ', outputDir);
 
             // create output directory if it doesn't yet exist
             if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
@@ -142,7 +224,7 @@ export async function fromAssetHelper(
             }
             // if choosing Typescript transpiler
             else if (config.buildMode === BuildMode.Typescript) {
-              tsTranspiling(sourceFilePath, outputDir);
+              tsTranspiling(sourceFilePath, path.resolve(outputDir, 'index.js'));
             }
             // if choosing ESbuild transpiler
             else if (config.buildMode === BuildMode.Esbuild) {
@@ -164,7 +246,11 @@ export async function fromAssetHelper(
                   ...config.esBuildOptions
                 };
 
-                esbuildBuilding(sourceFilePath, outputDir, 'index.cjs', esBuildOptions);
+                esbuildBuilding({
+                  targetModule: sourceFilePath,
+                  outputFilePath: path.join(`${outputDir}/index.cjs`),
+                  buildOptions: esBuildOptions
+                });
               }
               else {
                 //AppSync function build
@@ -183,12 +269,11 @@ export async function fromAssetHelper(
                   ...config.esBuildOptions
                 };
 
-                esbuildBuilding(
-                  sourceFilePath,
-                  outputDir,
-                  'index.js',
-                  esBuildOptions
-                );
+                esbuildBuilding({
+                  targetModule: sourceFilePath,
+                  outputFilePath: path.join(`${outputDir}/index.js`),
+                  buildOptions: esBuildOptions
+                });
               }
             }
 
@@ -200,9 +285,6 @@ export async function fromAssetHelper(
       },
     },
   });
-
-  console.log('Asset created:', asset.path);
-  console.log('Asset created:', asset);
 
   return asset;
 }
@@ -247,46 +329,40 @@ const tsGetTranspiledCode = (targetModule: string, tsTranspileOptions: TSTranspi
   }).outputText;
 };
 
-const tsTranspiling = (targetModule: string, outputDir: string, tsTranspileOptions: TSTranspileOptions = {}) => {
+const tsTranspiling = (targetModule: string, outputFilePath: string, tsTranspileOptions: TSTranspileOptions = {}) => {
 
   // Transpile the source ts code into js code
   const transpiledCode = tsGetTranspiledCode(targetModule, tsTranspileOptions);
 
   // Write the transpiled file to the output directory
-  const outputFilePath = path.join(
-    outputDir,
-    'index.js' //path.basename(targetModule).replace('.ts', '.js')
-  );
-
   fs.writeFileSync(outputFilePath, transpiledCode);
 
   return outputFilePath;
 };
 
-export const esbuildBuilding = (targetModule: string, outputDir: string, outputFileName: string, buildOptions: ESBuildOptions = {}) => {
+export const esbuildBuilding = (options: {
+  targetModule: string,
+  outputFilePath: string,
+  buildOptions?: ESBuildOptions
+}) => {
 
   // Build the source file with esbuild and write it to the output directory
   // as a CommonJS module
 
-  let outfile = path.join(
-    outputDir,
-    outputFileName
-  );
-
   let buildResult = buildSync({
-    outfile,
-    entryPoints: [targetModule],
-    ...buildOptions
+    outfile: options.outputFilePath,
+    entryPoints: [options.targetModule],
+    ...options.buildOptions
   });
 
   console.log('Building with esbuild:', {
-    source: targetModule,
-    output: outfile,
+    source: options.targetModule,
+    output: options.outputFilePath,
     buildErrors: buildResult.errors,
     buildWarnings: buildResult.warnings
   });
 
-  return outfile;
+  return options.outputFilePath;
 };
 
 export const esLinting = async (sourceFilePath: string, tsConfig: string) => {

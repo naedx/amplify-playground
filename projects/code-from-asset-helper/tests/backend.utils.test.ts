@@ -25,7 +25,7 @@ describe('appsync builder', () => {
 
     const sourceFilePath = path.resolve('./tests/create-report.resolver.ts');
 
-    const outputDirectory = path.resolve(`./tests/built-assets/asset.${getRandomInt(10000, 99999)}`);
+    const outputDir = path.resolve(`./tests/built-assets/asset.${getRandomInt(10000, 99999)}`);
 
     esLinting(sourceFilePath, path.resolve('./tests/tsconfig.json'));
 
@@ -45,12 +45,11 @@ describe('appsync builder', () => {
       // ...config.esBuildOptions
     };
 
-    const outFile = await esbuildBuilding(
-      sourceFilePath,
-      outputDirectory,
-      path.basename(sourceFilePath).replace('.ts', '.js'),
-      esBuildOptions
-    );
+    const outFile = await esbuildBuilding({
+      targetModule: sourceFilePath,
+      outputFilePath: path.join(outputDir, path.basename(sourceFilePath).replace('.ts', '.js')),
+      buildOptions: esBuildOptions
+    });
 
     expect(outFile).not.toBeNull();
 
