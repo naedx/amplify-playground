@@ -35,7 +35,7 @@
     "build": "tsc",
     "postbuild": "node -e \"require('fs').copyFileSync('./README.md', './dist/README.md');\"",
     "lint": "eslint ./lib",
-    "prepublish": "npm run build && npm run test && npm run lint",
+    "prepublishOnly": "npm run build && npm run test && npm run lint",
     "publish": "npm publish --access public",
     "test": "vitest --run && echo 'All tests passed!'"
   },
