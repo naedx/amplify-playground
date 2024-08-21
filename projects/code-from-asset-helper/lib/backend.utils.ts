@@ -90,7 +90,7 @@ export async function appSyncCodeFromAssetHelper(
  * 
  * @returns A Code object
  */
-export async function fromAssetHelper(
+async function fromAssetHelper(
   sourceFilePath: string,
   config: AssetHelperConfig | AppSyncAssetHelperConfigBase,
   codeType: 'lambda' | 'appsync'
