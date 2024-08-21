@@ -33,7 +33,7 @@
   "scripts": {
     "build": "tsc",
     "lint": "eslint ./lib",
-    "prepublish": "tsc && npm run test",
+    "prepublish": "tsc && npm run test && npm run lint",
     "publish": "npm publish --access public",
     "test": "vitest --run && echo 'All tests passed!'"
   },
