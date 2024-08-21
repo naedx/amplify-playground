@@ -30,8 +30,10 @@
   },
   "homepage": "https://github.com/naedx/amplify-playground/tree/dev/projects/code-from-asset-helper#readme",
   "scripts": {
-    "prepublish": "tsc",
-    "build": "tsc"
+    "build": "tsc",
+    "prepublish": "tsc && npm run test",
+    "publish": "npm publish --access public",
+    "test": "vitest --run && echo 'All tests passed!'"
   },
   "devDependencies": {
     "@aws-appsync/utils": "^1.9.0",
