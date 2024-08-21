@@ -133,24 +133,20 @@ async function fromAssetHelper(
       outputType: codeType === 'appsync' ? BundlingOutput.SINGLE_FILE : undefined,
       local: {
         tryBundle(outputDir: string) {
+
+          // create output directory if it doesn't yet exist
+          if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+
           try {
-
-            // create output directory if it doesn't yet exist
-            if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
-
-            try {
-              //copy the built file to the output directory
-              fs.copyFileSync(builtSourcePath, path.join(outputDir, path.basename(builtSourcePath)));
-            }
-            catch (ex) {
-              console.error('Error copying built file to output: ', ex);
-              throw ex;
-            }
-
-            return true;
-          } catch (error) {
-            throw error; // throw an error to prevent falling back to the docker build mode
+            //copy the built file to the output directory
+            fs.copyFileSync(builtSourcePath, path.join(outputDir, path.basename(builtSourcePath)));
           }
+          catch (ex) {
+            console.error('Error copying built file to output: ', ex);
+            throw ex; // rethrow error to prevent falling back to the docker build mode
+          }
+
+          return true;
         },
       },
     },
@@ -285,7 +281,6 @@ async function build(config: AssetHelperConfig | AppSyncAssetHelperConfigBase, s
 
   const outputDir = path.join(tempDir, 'code-from-asset-helper', `asset.${getRandomInt(10000, 99999)}`);
 
-
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
   let fileName = 'index';
@@ -297,17 +292,17 @@ async function build(config: AssetHelperConfig | AppSyncAssetHelperConfigBase, s
   }
 
   switch (config.buildMode) {
-    case BuildMode.Off:
+    case BuildMode.Off: {
       // if the source file is already js
       const outfilePath = path.join(outputDir, `${fileName}.js`);
       fs.copyFileSync(sourceFilePath, outfilePath);
       return outfilePath;
-    // break;
-    case BuildMode.Typescript:
+    }
+    case BuildMode.Typescript: {
       // if choosing Typescript transpiler
       return tsTranspiling(sourceFilePath, path.join(outputDir, `${fileName}.js`));
-    // break;
-    case BuildMode.Esbuild:
+    }
+    case BuildMode.Esbuild: {
       // if choosing ESbuild transpiler
       const esConfig = config as AppSyncAssetHelperConfigES;
 
@@ -319,7 +314,7 @@ async function build(config: AssetHelperConfig | AppSyncAssetHelperConfigBase, s
       };
 
       switch (codeType) {
-        case 'lambda':
+        case 'lambda': {
           return esbuildBuilding({
             sourceFilePath: sourceFilePath,
             outputFilePath: path.join(outputDir, `${fileName}.cjs`),
@@ -336,9 +331,9 @@ async function build(config: AssetHelperConfig | AppSyncAssetHelperConfigBase, s
               ...esConfig.esBuildOptions // apply user defined overrides
             }
           });
-        // break;
+        }
 
-        case 'appsync':
+        case 'appsync': {
           return esbuildBuilding({
             sourceFilePath: sourceFilePath,
             outputFilePath: path.join(outputDir, `${fileName}.js`),
@@ -353,17 +348,16 @@ async function build(config: AssetHelperConfig | AppSyncAssetHelperConfigBase, s
               ...esConfig.esBuildOptions // apply user defined overrides
             }
           });
-        // break;
+        }
 
         default:
           throw new Error(`Invalid value for 'codeType': ${codeType}`);
       }
 
-    // break;
+    }
     default:
       throw new Error(`Invalid value for 'buildMode': ${config.buildMode}`);
   }
-
 
 }
 
