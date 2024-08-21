@@ -7,7 +7,7 @@
   "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/naedx/amplify-playground.git"
+    "url": "git+ssh://git@github.com/naedx/amplify-playground.git/projects/code-from-asset-helper"
   },
   "files": [
     "dist/index.d.ts",
@@ -36,7 +36,7 @@
     "postbuild": "node -e \"require('fs').copyFileSync('./README.md', './dist/README.md');\"",
     "lint": "eslint ./lib",
     "prepublishOnly": "npm run build && npm run test && npm run lint",
-    "publish": "npm publish --access public",
+    "pub": "npm publish --access public",
     "test": "vitest --run && echo 'All tests passed!'"
   },
   "devDependencies": {
