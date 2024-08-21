@@ -42,7 +42,6 @@ describe('appsync builder', () => {
         '@aws-sdk/s3-request-presigner',
       ],
       bundle: true,
-      // ...config.esBuildOptions
     };
 
     const outFile = await esbuildBuilding({
@@ -79,16 +78,6 @@ describe('appsync builder', () => {
 
   });
 
-  // test('should create asset', async () => {
-  //   const result = await appSyncCodeFromAssetHelper(path.resolve('./tests/create-report.resolver.ts'), {
-  //     buildMode: BuildMode.Off,
-  //     tsConfig: path.resolve('./tests/tsconfig.json')
-  //   });
-
-  //   expect(result).not.toBeNull();
-
-  //   console.log(result);
-  // });
 });
 
 function getRandomInt(min: number, max: number) {
