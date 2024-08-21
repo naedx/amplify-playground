@@ -116,3 +116,6 @@ backend.data.addResolver('createTodo', {
   });
 
 ```
+## License
+
+Apache License 2.0
