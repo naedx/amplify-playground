@@ -1,7 +1,7 @@
 {
   "name": "@amplify-playground/code-from-asset-helper",
   "version": "1.0.0",
-  "description": "A helper to build, bundle and copy a function to the Amplify assets directory.",
+  "description": "A helper to build, bundle and copy a lambda or AppSync function to the Amplify assets directory.",
   "main": "dist/index.js",
   "type": "module",
   "types": "dist/index.d.ts",
@@ -13,7 +13,8 @@
     "dist/index.d.ts",
     "dist/index.js",
     "dist/lib/backend.utils.d.ts",
-    "dist/lib/backend.utils.js"
+    "dist/lib/backend.utils.js",
+    "dist/README.md"
   ],
   "keywords": [
     "Amplify",
@@ -32,8 +33,9 @@
   "homepage": "https://github.com/naedx/amplify-playground/tree/dev/projects/code-from-asset-helper#readme",
   "scripts": {
     "build": "tsc",
+    "postbuild": "node -e \"require('fs').copyFileSync('./README.md', './dist/README.md');\"",
     "lint": "eslint ./lib",
-    "prepublish": "tsc && npm run test && npm run lint",
+    "prepublish": "npm run build && npm run test && npm run lint",
     "publish": "npm publish --access public",
     "test": "vitest --run && echo 'All tests passed!'"
   },
