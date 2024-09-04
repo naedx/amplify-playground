@@ -93,8 +93,9 @@ export async function appSyncCodeFromAssetHelper(
 async function fromAssetHelper(
   sourceFilePath: string,
   config: AssetHelperConfig | AppSyncAssetHelperConfigBase,
-  codeType: 'lambda' | 'appsync'
-): Promise<AppSyncCode | LambdaCode> {
+  codeType: 'lambda' | 'appsync',
+  returnAsString: boolean = false
+): Promise<AppSyncCode | LambdaCode | string> {
 
   // The local build mode:
   //     1. receives the path of the target file (.cjs/.js/.ts) as a string.
@@ -115,6 +116,10 @@ async function fromAssetHelper(
 
   if (!fs.existsSync(builtSourcePath)) {
     throw new Error(`The source file was not built successfully: ${builtSourcePath}`);
+  }
+
+  if (returnAsString) {
+    return fs.readFileSync(builtSourcePath, 'utf8');
   }
 
   const code = codeType === 'lambda' ? LambdaCode : AppSyncCode;
@@ -367,3 +372,28 @@ function getRandomInt(min: number, max: number) {
   return Math.floor(Math.random() * (maxFloored - minCeiled) + minCeiled); // The maximum is exclusive and the minimum is inclusive
 }
 
+/**
+ * This utility function is used to produce the inline code string from a local file.
+ *
+ * @param sourceFilePath - The path of the target file (.cjs/.js/.ts) as a string.
+ * 
+ * @param {AssetHelperConfig} config -  Configuration object for the asset helper.
+ * 
+ * @param {BuildMode} config.buildMode - The build mode to use for the source file.
+ *  - `Off`: no transpiling is done and the file is copied as is to the output directory.
+ *  - `Typescript`: the source file will be transpiled by the TypeScript compiler.
+ *  - `Esbuild`: the source file will be built and bundled by esbuild.
+ * 
+ * @param {BuildMode} config.esBuildOptions - The build options for esbuild. Only used if buildMode is set to Esbuild.
+ * 
+ * @param {BuildMode} config.tsTranspileOptions - The build options for TypeScript transpiler. Only used if buildMode is set to Typescript.
+ * 
+ * @returns A string of the build code
+ */
+export async function inlineAppSyncCodeFromAssetHelper(
+  sourceFilePath: string,
+  config: AssetHelperConfig,
+): Promise<string> {
+
+  return await fromAssetHelper(sourceFilePath, config, 'appsync', true) as string;
+}

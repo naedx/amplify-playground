@@ -1,9 +1,9 @@
 {
   "name": "@amplify-playground/code-from-asset-helper",
-  "version": "1.0.7",
+  "version": "1.0.9",
   "description": "A helper to build, bundle and copy a lambda or AppSync function to the Amplify assets directory.",
   "main": "dist/index.js",
-  "type": "module",
+  "type": "commonjs",
   "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
