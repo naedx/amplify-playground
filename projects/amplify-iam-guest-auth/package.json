@@ -1,0 +1,33 @@
+{
+  "name": "amplify-iam-guest-auth",
+  "version": "1.0.0",
+  "description": "A new Flutter project.",
+  "main": "index.js",
+  "directories": {
+    "lib": "lib",
+    "test": "test"
+  },
+  "scripts": {
+    "build:graphql-codegen": "graphql-codegen --config builders/graphql-codegen/graphql-codegen.config.ts",
+    "watch:graphql-codegen": "npm run build:graphql-codegen -- --watch",
+    "dart_buildrunner": "dart run build_runner watch --delete-conflicting-outputs",
+    "dart_buildrunner_nowatch": "dart run build_runner build --delete-conflicting-outputs",
+    "sandbox": "npx ampx sandbox --outputs-format dart --outputs-out-dir lib --outputs-version 0"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@aws-amplify/backend": "^1.2.1",
+    "@aws-amplify/backend-cli": "^1.2.6",
+    "aws-cdk": "^2.158.0",
+    "aws-cdk-lib": "^2.158.0",
+    "constructs": "^10.3.0",
+    "esbuild": "^0.23.1",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
+  },
+  "dependencies": {
+    "aws-amplify": "^6.6.0"
+  }
+}
