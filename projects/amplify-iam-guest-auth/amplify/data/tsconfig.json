@@ -7,7 +7,8 @@
         "features/**/*.lambda.ts",
         "features/**/*.lambda/**/*.ts",
         "schema/generated/**/*.ts",
-        "schema/generated/**/*.json"
+        "schema/generated/**/*.json",
+        "**/resource.ts"
     ],
     "exclude": [
         "**/*.test.ts",

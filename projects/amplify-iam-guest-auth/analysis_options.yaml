@@ -35,4 +35,3 @@ analyzer:
     - lib/models/amplify/**
     - lib/data/models/**/*.freezed.dart
     - lib/data/models/**/*.g.dart
-    - lib/data/models/**
