@@ -1,0 +1,10 @@
+{
+  "extends": [
+    "./.eslintrc.json",
+    "plugin:@aws-appsync/recommended"
+  ],
+  "ignorePatterns": [
+    "**/*.test.ts",
+    "**/*.test.js"
+  ]
+}

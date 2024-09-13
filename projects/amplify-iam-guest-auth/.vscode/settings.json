@@ -1,0 +1,8 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    "amazonQ.telemetry": false,
+    "editor.tabSize": 2,
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.expand": false,
+    "gitlens.telemetry.enabled": false
+}

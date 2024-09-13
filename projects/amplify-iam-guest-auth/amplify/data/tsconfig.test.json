@@ -1,0 +1,13 @@
+{
+    "extends": "./tsconfig.json",
+    "include": [
+        "common/**/*.ts",
+        "common/**/*.resolver.ts",
+        "features/**/*.resolver.ts",
+        "features/**/*.lambda.ts",
+        "features/**/*.lambda/**/*.ts",
+        "schema/generated/**/*.ts",
+        "schema/generated/**/*.json",
+        "**/*.test.ts"
+    ]
+}

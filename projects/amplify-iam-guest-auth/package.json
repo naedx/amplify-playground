@@ -20,12 +20,26 @@
   "devDependencies": {
     "@aws-amplify/backend": "^1.2.1",
     "@aws-amplify/backend-cli": "^1.2.6",
-    "aws-cdk": "^2.158.0",
-    "aws-cdk-lib": "^2.158.0",
+    "aws-cdk": "^2.155.0",
+    "aws-cdk-lib": "^2.155.0",
     "constructs": "^10.3.0",
-    "esbuild": "^0.23.1",
-    "tsx": "^4.19.1",
-    "typescript": "^5.6.2"
+    "esbuild": "^0.21.5",
+    "tsx": "^4.16.2",
+    "typescript": "^5.5.4",
+    "@graphql-codegen/cli": "5.0.2",
+    "@graphql-codegen/flutter-freezed": "^4.0.0",
+    "@graphql-codegen/introspection": "4.0.3",
+    "@graphql-codegen/typescript": "4.0.9",
+    "@graphql-codegen/typescript-document-nodes": "4.0.9",
+    "@graphql-codegen/typescript-resolvers": "^4.2.1",
+    "@parcel/watcher": "^2.4.1",
+    "@typescript-eslint/eslint-plugin": "^7.17.0",
+    "aws-amplify": "^6.5.3",
+    "esbuild-plugin-eslint": "^0.3.12",
+    "eslint": "^8.57.0",
+    "glob": "^11.0.0",
+    "graphql": "^16.9.0",
+    "uuid": "^10.0.0"
   },
   "dependencies": {
     "aws-amplify": "^6.6.0"

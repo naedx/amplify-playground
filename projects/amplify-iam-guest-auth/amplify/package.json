@@ -1,3 +1,11 @@
 {
-  "type": "module"
+  "type": "module",
+  "devDependencies": {
+    "@aws-appsync/utils": "^1.9.0",
+    "@typescript-eslint/parser": "^7.17.0",
+    "aws-sdk": "^2.1687.0",
+    "esbuild": "0.23.0",
+    "glob": "^11.0.0",
+    "typescript": "^5.5.4"
+  }
 }

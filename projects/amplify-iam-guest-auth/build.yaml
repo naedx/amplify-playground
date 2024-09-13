@@ -1,0 +1,21 @@
+## This file configures the GraphQL Codegen (graphql_codegen) dart package.
+targets:
+  $default:
+    builders:
+      graphql_codegen:
+        options:
+          clients:
+            - graphql_flutter
+          assetsPath: lib/api/amplify/**.graphql
+          scalars:
+              ID:
+                type: String
+              AWSDateTime:
+                type: String
+              AWSTimestamp:
+                type: int
+              AWSJSON:
+                type: CustomAWSJSON
+                fromJsonFunctionName: customAWSJSONFromJson
+                toJsonFunctionName: customAWSJSONToJson
+                import: package:amplify_iam_guest_auth/api/amplify/scalars.dart

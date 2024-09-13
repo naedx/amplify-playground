@@ -1,0 +1,46 @@
+enum PostType {
+  Post
+}
+
+type Post
+  @model(mutations: null, queries: null, subscriptions: null)
+  @aws_iam
+  @aws_cognito_user_pools
+  @aws_api_key
+{
+  id: ID!
+  name: String!
+  subject: String!
+  message: String!
+  formId: String!
+  type: PostType!
+  createdAt: AWSDateTime!
+  createdBy: String
+}
+
+input CreatePostInput
+{
+  name: String!
+  subject: String!
+  message: String!
+  formId: String!
+}
+
+type CreatePostResult
+    @aws_iam
+    @aws_cognito_user_pools
+    @aws_api_key
+{
+  id: ID!
+}
+
+type Query {
+  echo: String
+}
+
+type Mutation {
+  createPost(input: CreatePostInput!): CreatePostResult 
+    @aws_iam
+    @aws_cognito_user_pools
+    @aws_api_key
+}
