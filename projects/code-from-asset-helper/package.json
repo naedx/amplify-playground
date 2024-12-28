@@ -1,6 +1,6 @@
 {
   "name": "@amplify-playground/code-from-asset-helper",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "description": "A helper to build, bundle and copy a lambda or AppSync function to the Amplify assets directory.",
   "main": "dist/index.js",
   "type": "module",
@@ -40,16 +40,16 @@
     "test": "vitest --run && echo 'All tests passed!'"
   },
   "devDependencies": {
-    "@aws-appsync/utils": "^1.9.0",
-    "@eslint/js": "^9.9.0",
-    "@types/eslint": "^8.56.11",
-    "@types/node": "^20.14.15",
-    "@typescript-eslint/parser": "^8.1.0",
-    "eslint": "^8.57.0",
-    "globals": "^15.9.0",
-    "typescript": "^5.5.4",
-    "typescript-eslint": "^8.2.0",
-    "vitest": "^2.0.5"
+    "@aws-appsync/utils": "^1.12.0",
+    "@eslint/js": "^9.17.0",
+    "@types/eslint": "^8.56.12",
+    "@types/node": "^20.17.10",
+    "@typescript-eslint/parser": "^8.18.2",
+    "eslint": "^8.57.1",
+    "globals": "^15.14.0",
+    "typescript": "^5.7.2",
+    "typescript-eslint": "^8.18.2",
+    "vitest": "^2.1.8"
   },
   "peerDependencies": {
     "@aws-appsync/eslint-plugin": "^1.6.0",
