@@ -26,6 +26,10 @@ describe("appsync builder", () => {
           },
         },
       });
+
+      if (lintResult !== false) {
+        throw Error(lintResult);
+      }
     }).rejects.toThrow("2 linting error(s)");
   });
 

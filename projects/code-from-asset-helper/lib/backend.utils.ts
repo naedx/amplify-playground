@@ -278,7 +278,7 @@ export const esLinting = async (args: {
   sourceFilePath: string;
   // tsConfig: string;
   overrideEslintConfig?: OverridesConfigType;
-}) => {
+}): Promise<string | false> => {
   //setup base config for appsync or lambda
   const baseConfig =
     args.source === "appsync"
