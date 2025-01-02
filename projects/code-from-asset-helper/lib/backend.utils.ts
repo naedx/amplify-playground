@@ -128,7 +128,7 @@ async function fromAssetHelper(
 
   if (!fs.existsSync(builtSourcePath)) {
     throw new Error(
-      `The source file was not built successfully: ${builtSourcePath}`
+      `The source file was not built successfully: ${sourceFilePath}`
     );
   }
 
@@ -180,7 +180,7 @@ export interface AssetHelperConfig {
   buildMode: BuildMode;
   esBuildOptions?: ESBuildOptions;
   tsTranspileOptions?: TSTranspileOptions;
-  overrideEslintConfig?: Linter.Config;
+  overrideEslintConfig?: OverridesConfigType;
 }
 
 interface AppSyncAssetHelperConfigBase extends AssetHelperConfig {
@@ -273,65 +273,27 @@ export const esbuildBuilding = (options: {
   return options.outputFilePath;
 };
 
-export const esLintingAppSync = async (args: {
+export const esLinting = async (args: {
+  source: "appsync" | "lambda";
   sourceFilePath: string;
   // tsConfig: string;
-  overrideEslintConfig?: Linter.Config;
+  overrideEslintConfig?: OverridesConfigType;
 }) => {
+  //setup base config for appsync or lambda
+  const baseConfig =
+    args.source === "appsync"
+      ? (appSyncESlintPlugin.configs?.recommended as Linter.Config)
+      : {
+          extends: [
+            "eslint:recommended",
+            "plugin:@typescript-eslint/eslint-recommended",
+            "plugin:@typescript-eslint/recommended",
+          ],
+          plugins: ["@typescript-eslint"],
+        };
+
   const eslint = new ESLint({
-    baseConfig: appSyncESlintPlugin.configs?.recommended as Linter.Config,
-    overrideConfig: args.overrideEslintConfig,
-    // overrideConfig: {
-    //   parserOptions: {
-    //     project: args.tsConfig,
-    //   },
-    // },
-  });
-
-  const lintResults = (await eslint.lintFiles([args.sourceFilePath]))[0];
-
-  if (lintResults.errorCount > 0) {
-    const messages = [
-      ...lintResults.messages,
-      ...lintResults.suppressedMessages,
-    ].map((m) => {
-      if (m.ruleId !== null) {
-        return m.ruleId;
-      } else if (m.fatal) {
-        return `Fatal error: ${m.message}`;
-      } else {
-        return `Error: ${m.message}`;
-      }
-    });
-
-    console.error(`${lintResults.errorCount} linting error(s)::`, messages);
-    throw new Error(
-      `${lintResults.errorCount} linting error(s) found:: ${messages.join(
-        ", "
-      )}`
-    );
-  }
-
-  return true;
-};
-
-export const esLintingLambda = async (args: {
-  sourceFilePath: string;
-  // tsConfig?: string;
-  overrideEslintConfig?: Linter.Config;
-}) => {
-  const eslint = new ESLint({
-    baseConfig: {
-      extends: [
-        "eslint:recommended",
-        "plugin:@typescript-eslint/eslint-recommended",
-        "plugin:@typescript-eslint/recommended",
-      ],
-      // parserOptions: {
-      //   project: args.tsConfig,
-      // },
-      plugins: ["@typescript-eslint"],
-    },
+    baseConfig,
     overrideConfig: args.overrideEslintConfig,
   });
 
@@ -343,7 +305,15 @@ export const esLintingLambda = async (args: {
       ...lintResults.suppressedMessages,
     ].map((m) => {
       if (m.ruleId !== null) {
-        return m.ruleId;
+        let errorMessage = `Severity: ${m.severity}\n`;
+        errorMessage += `Rule: ${m.ruleId}\n`;
+        errorMessage += `Message: ${m.message}\n`;
+        errorMessage += `Location: line ${m.line}:${m.column} ${
+          m.endLine && m.endColumn ? "to " + m.endLine + ":" + m.endColumn : ""
+        }\n`;
+        if (m.fix) errorMessage += `Fix: ${m.fix.text}.`;
+
+        return errorMessage;
       } else if (m.fatal) {
         return `Fatal error: ${m.message}`;
       } else {
@@ -351,15 +321,14 @@ export const esLintingLambda = async (args: {
       }
     });
 
-    console.error(`${lintResults.errorCount} linting error(s)::`, messages);
-    throw new Error(
-      `${lintResults.errorCount} linting error(s) found:: ${messages.join(
-        ", "
-      )}`
-    );
+    const fullErrorMessage = `${
+      lintResults.errorCount
+    } linting error(s) found:: \n\n${messages.join("\n\n")}\n\n\n`;
+
+    return fullErrorMessage;
   }
 
-  return true;
+  return false;
 };
 
 async function build(
@@ -381,20 +350,33 @@ async function build(
 
   if (codeType === "appsync") {
     //perform linting if the code is for AppSync
-    await esLintingAppSync({
+    const result = await esLinting({
+      source: "appsync",
       sourceFilePath,
       // tsConfig: (config as AppSyncAssetHelperConfigBase).tsConfig,
       overrideEslintConfig: config.overrideEslintConfig,
     });
+
+    if (result !== false) {
+      const errorMessage = `The source file was not built successfully: ${sourceFilePath}\n\n${result}`;
+      throw new Error(errorMessage);
+    }
+
     fileName = path
       .basename(sourceFilePath)
       .replace(path.extname(sourceFilePath), ""); // get file name without extension
   } else {
-    await esLintingLambda({
+    const result = await esLinting({
+      source: "lambda",
       sourceFilePath,
       // tsConfig: config.tsConfig,
       overrideEslintConfig: config.overrideEslintConfig,
     });
+
+    if (result !== false) {
+      const errorMessage = `The source file was not built successfully: ${sourceFilePath}\n\n${result}`;
+      throw new Error(errorMessage);
+    }
   }
 
   switch (config.buildMode) {
@@ -500,3 +482,8 @@ export async function inlineAppSyncCodeFromAssetHelper(
     true
   )) as string;
 }
+
+export type OverridesConfigType = Linter.Config<
+  Linter.RulesRecord,
+  Linter.RulesRecord
+>;

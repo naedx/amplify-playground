@@ -2,7 +2,7 @@ import path from "path";
 import { describe, expect, test } from "vitest";
 import {
   esbuildBuilding,
-  esLintingAppSync,
+  esLinting,
   tsTranspiling,
 } from "../lib/backend.utils";
 
@@ -17,7 +17,8 @@ describe("appsync builder", () => {
     );
 
     expect(async () => {
-      const lintResult = await esLintingAppSync({
+      const lintResult = await esLinting({
+        source: "appsync",
         sourceFilePath,
         overrideEslintConfig: {
           parserOptions: {
@@ -35,7 +36,8 @@ describe("appsync builder", () => {
       `./tests/built-assets/asset.${getRandomInt(10000, 99999)}`
     );
 
-    esLintingAppSync({
+    esLinting({
+      source: "appsync",
       sourceFilePath,
       overrideEslintConfig: {
         parserOptions: {
@@ -84,7 +86,8 @@ describe("appsync builder", () => {
 
     if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
 
-    esLintingAppSync({
+    esLinting({
+      source: "appsync",
       sourceFilePath,
       overrideEslintConfig: {
         parserOptions: {
