@@ -16,21 +16,24 @@ describe("appsync builder", () => {
       "./tests/create-report.fail.resolver.ts"
     );
 
-    expect(async () => {
+    await expect(async () => {
       const lintResult = await esLinting({
         source: "appsync",
         sourceFilePath,
         overrideEslintConfig: {
-          parserOptions: {
-            project: path.resolve("./tests/tsconfig.json"),
+          languageOptions: {
+            parserOptions: {
+              project: path.resolve("./tests/tsconfig.json"),
+            },
           },
         },
+        lintJs: false,
       });
 
       if (lintResult !== false) {
         throw Error(lintResult);
       }
-    }).rejects.toThrow("2 linting error(s)");
+    }).rejects.toThrow("3 linting error(s)");
   });
 
   test("esbuild should create output", async () => {
@@ -44,10 +47,13 @@ describe("appsync builder", () => {
       source: "appsync",
       sourceFilePath,
       overrideEslintConfig: {
-        parserOptions: {
-          project: path.resolve("./tests/tsconfig.json"),
+        languageOptions: {
+          parserOptions: {
+            project: path.resolve("./tests/tsconfig.json"),
+          },
         },
       },
+      lintJs: false,
     });
 
     //AppSync function build
@@ -94,10 +100,13 @@ describe("appsync builder", () => {
       source: "appsync",
       sourceFilePath,
       overrideEslintConfig: {
-        parserOptions: {
-          project: path.resolve("./tests/tsconfig.json"),
+        languageOptions: {
+          parserOptions: {
+            project: path.resolve("./tests/tsconfig.json"),
+          },
         },
       },
+      lintJs: false,
     });
 
     const outFile = tsTranspiling(

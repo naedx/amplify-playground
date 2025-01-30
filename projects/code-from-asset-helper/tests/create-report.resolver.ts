@@ -1,8 +1,7 @@
-import { Context, util } from '@aws-appsync/utils';
-import { CreateModelMetaData, getLoggedInUserId } from './helpers';
+import { Context, util } from "@aws-appsync/utils";
+import { CreateModelMetaData, getLoggedInUserId } from "./helpers";
 
 export function request(ctx: Context<{ input: any }>) {
-
   const metaData: CreateModelMetaData = {
     createdBy: getLoggedInUserId(ctx),
     createdAt: util.time.nowISO8601(),
@@ -11,13 +10,12 @@ export function request(ctx: Context<{ input: any }>) {
   const values = ctx.args.input;
 
   return {
-    operation: 'PutItem',
+    operation: "PutItem",
     key: util.dynamodb.toMapValues({ id: util.autoId() }),
     attributeValues: util.dynamodb.toMapValues({
       ...values,
-      ...metaData
+      ...metaData,
     }),
-
   };
 }
 
