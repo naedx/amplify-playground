@@ -296,10 +296,7 @@ export const esbuildBuilding = (options: {
   };
 };
 
-export type EsLintingArgsType = (
-  | EsLintingFilesArgsType
-  | EsLintingTextArgsType
-) & { lintJs: boolean };
+export type EsLintingArgsType = EsLintingFilesArgsType | EsLintingTextArgsType;
 
 export type EsLintingFilesArgsType = {
   source: "appsync" | "lambda";
@@ -319,7 +316,7 @@ export const esLinting = async (
   //setup base config for appsync or lambda
 
   const eslint = new ESLint({
-    ...getEslintBaseConfig(args.source, args.lintJs),
+    ...getEslintBaseConfig(args.source),
     overrideConfig: args.overrideEslintConfig,
   });
 
@@ -367,16 +364,10 @@ export const esLinting = async (
   return false;
 };
 
-function getEslintBaseConfig(
-  source: "appsync" | "lambda",
-  lintJs?: boolean
-): ESLint.Options {
-  const baseConfigs =
-    lintJs === true
-      ? [eslint.configs.recommended]
-      : (tseslint.config(
-          ...[eslint.configs.recommended, tseslint.configs.recommended]
-        ) as Linter.Config[]);
+function getEslintBaseConfig(source: "appsync" | "lambda"): ESLint.Options {
+  const baseConfigs = tseslint.config(
+    ...[eslint.configs.recommended, tseslint.configs.recommended]
+  ) as Linter.Config[];
 
   return source === "appsync"
     ? {
@@ -447,7 +438,6 @@ async function build(
     codeType,
     sourceFilePath,
     config,
-    lintJs: false,
     debugSource: sourceFilePath,
   });
 
@@ -547,7 +537,7 @@ async function build(
 type LintHelperArgsType = (
   | LintHelperArgsForFileType
   | LintHelperArgsForTextType
-) & { lintJs: boolean; debugSource: string };
+) & { debugSource: string };
 
 type LintHelperArgsForFileType = {
   codeType: string;
@@ -578,7 +568,7 @@ export async function lintNestedFiles(
         codeType,
         sourceText: builtFileText,
         config,
-        lintJs: false,
+
         debugSource: nestedImport,
       });
     } catch (e: unknown) {
@@ -609,7 +599,7 @@ async function lintHelper(args: LintHelperArgsType) {
     const result = await esLinting({
       source: "appsync",
       overrideEslintConfig: args.config.overrideEslintConfig,
-      lintJs: args.lintJs,
+
       ...lintSourceConfig,
     });
 
@@ -621,7 +611,7 @@ async function lintHelper(args: LintHelperArgsType) {
     const result = await esLinting({
       source: "lambda",
       overrideEslintConfig: args.config.overrideEslintConfig,
-      lintJs: args.lintJs,
+
       ...lintSourceConfig,
     });
 

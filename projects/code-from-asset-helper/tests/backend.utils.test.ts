@@ -29,7 +29,6 @@ describe("appsync builder", () => {
             },
           },
         },
-        lintJs: false,
       });
 
       if (lintResult !== false) {
@@ -55,7 +54,6 @@ describe("appsync builder", () => {
           },
         },
       },
-      lintJs: false,
     });
 
     //AppSync function build
@@ -108,7 +106,6 @@ describe("appsync builder", () => {
           },
         },
       },
-      lintJs: false,
     });
 
     const outFile = tsTranspiling(
@@ -143,7 +140,6 @@ test("esbuild should detect errors in nested files", async () => {
     source: "appsync",
     sourceFilePath,
     overrideEslintConfig: overrideConfig,
-    lintJs: false,
   });
 
   //AppSync function build
