@@ -1,13 +1,16 @@
 import { Context, util } from "@aws-appsync/utils";
 import { CreateModelMetaData, getLoggedInUserId } from "./helpers";
+import { addition } from "./utils.fail.resolver";
 
-export function request(ctx: Context<{ input: any }>) {
+export function request(ctx: Context<{ input: object }>) {
   const metaData: CreateModelMetaData = {
     createdBy: getLoggedInUserId(ctx),
     createdAt: util.time.nowISO8601(),
   };
 
   const values = ctx.args.input;
+
+  console.log(addition(1, 2));
 
   return {
     operation: "PutItem",

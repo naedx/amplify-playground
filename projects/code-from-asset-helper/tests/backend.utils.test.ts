@@ -1,8 +1,10 @@
 import path from "path";
 import { describe, expect, test } from "vitest";
 import {
+  BuildMode,
   esbuildBuilding,
   esLinting,
+  lintNestedFiles,
   tsTranspiling,
 } from "../lib/backend.utils";
 
@@ -71,7 +73,7 @@ describe("appsync builder", () => {
       bundle: true,
     };
 
-    const outFile = await esbuildBuilding({
+    const buildOutput = await esbuildBuilding({
       sourceFilePath,
       outputFilePath: path.join(
         outputDir,
@@ -80,9 +82,9 @@ describe("appsync builder", () => {
       buildOptions: esBuildOptions,
     });
 
-    expect(outFile).not.toBeNull();
+    expect(buildOutput.outputFilePath).not.toBeNull();
 
-    const assetCreated = fs.existsSync(outFile);
+    const assetCreated = fs.existsSync(buildOutput.outputFilePath);
 
     expect(assetCreated).toBe(true);
   });
@@ -120,6 +122,61 @@ describe("appsync builder", () => {
 
     expect(assetCreated).toBe(true);
   });
+});
+
+test("esbuild should detect errors in nested files", async () => {
+  const sourceFilePath = path.resolve("./tests/create-report.resolver.ts");
+
+  const outputDir = path.resolve(
+    `./tests/built-assets/asset.${getRandomInt(10000, 99999)}`
+  );
+
+  const overrideConfig = {
+    languageOptions: {
+      parserOptions: {
+        project: path.resolve("./tests/tsconfig.json"),
+      },
+    },
+  };
+
+  esLinting({
+    source: "appsync",
+    sourceFilePath,
+    overrideEslintConfig: overrideConfig,
+    lintJs: false,
+  });
+
+  //AppSync function build
+  const esBuildOptions: ESBuildOptions = {
+    sourcemap: "inline",
+    sourcesContent: false,
+    format: "esm",
+    target: "esnext",
+    platform: "node",
+    external: [
+      "@aws-appsync/utils",
+      "@aws-sdk/client-s3",
+      "@aws-sdk/s3-request-presigner",
+    ],
+    bundle: true,
+  };
+
+  const buildOutput = await esbuildBuilding({
+    sourceFilePath,
+    outputFilePath: path.join(
+      outputDir,
+      path.basename(sourceFilePath).replace(".ts", ".js")
+    ),
+    buildOptions: esBuildOptions,
+  });
+
+  await expect(async () => {
+    await lintNestedFiles(buildOutput.nestedLocalImports, "appsync", {
+      buildMode: BuildMode.Esbuild,
+      esBuildOptions,
+      overrideEslintConfig: overrideConfig,
+    });
+  }).rejects.toThrow("2 nested file(s) have errors.");
 });
 
 function getRandomInt(min: number, max: number) {

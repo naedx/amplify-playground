@@ -9,6 +9,8 @@ import path from "path";
 
 import os from "os";
 
+import tseslint from "typescript-eslint";
+
 import { buildSync, BuildOptions as ESBuildOptions } from "esbuild";
 import { ESLint, Linter } from "eslint";
 import fs from "fs";
@@ -265,7 +267,7 @@ export const esbuildBuilding = (options: {
   sourceFilePath: string;
   outputFilePath: string;
   buildOptions?: ESBuildOptions;
-}): string => {
+}): { outputFilePath: string; nestedLocalImports: string[] } => {
   // Build the source file with esbuild and write it to the output directory
   // as a CommonJS module
 
@@ -276,9 +278,22 @@ export const esbuildBuilding = (options: {
     ...options.buildOptions,
   });
 
-  // throw Error(JSON.stringify(Object.keys(buildResult.metafile?.inputs ?? {})));
+  const nestedImports = Object.entries(buildResult.metafile?.inputs ?? {})
+    .filter(function (entry) {
+      const [key] = entry;
 
-  return options.outputFilePath;
+      return (
+        key.includes("node_modules") === false &&
+        key.endsWith(".ts") &&
+        key.endsWith("generated.ts") === false
+      );
+    })
+    .map((e) => e[0]);
+
+  return {
+    nestedLocalImports: nestedImports,
+    outputFilePath: options.outputFilePath,
+  };
 };
 
 export type EsLintingArgsType = (
@@ -356,16 +371,12 @@ function getEslintBaseConfig(
   source: "appsync" | "lambda",
   lintJs?: boolean
 ): ESLint.Options {
-  // const baseConfigs =
-  //   lintJs === true
-  //     ? [eslint.configs.recommended]
-  //     : (tseslint.config(
-  //         ...[eslint.configs.recommended, tseslint.configs.recommended]
-  //       ) as Linter.Config[]);
-
-  console.log(lintJs);
-
-  const baseConfigs = [eslint.configs.recommended];
+  const baseConfigs =
+    lintJs === true
+      ? [eslint.configs.recommended]
+      : (tseslint.config(
+          ...[eslint.configs.recommended, tseslint.configs.recommended]
+        ) as Linter.Config[]);
 
   return source === "appsync"
     ? {
@@ -472,7 +483,7 @@ async function build(
 
       switch (codeType) {
         case "lambda": {
-          const outputFilePath = esbuildBuilding({
+          const buildOutput = esbuildBuilding({
             sourceFilePath: sourceFilePath,
             outputFilePath: path.join(outputDir, `${fileName}.cjs`),
             buildOptions: {
@@ -488,21 +499,17 @@ async function build(
           });
 
           // post-build linting
-          const builtFileText = fs.readFileSync(outputFilePath, "utf8");
-
-          await lintHelper({
+          await lintNestedFiles(
+            buildOutput.nestedLocalImports,
             codeType,
-            sourceText: builtFileText,
-            config,
-            lintJs: true,
-            debugSource: outputFilePath,
-          });
+            config
+          );
 
-          return outputFilePath;
+          return buildOutput.outputFilePath;
         }
 
         case "appsync": {
-          const outputFilePath = esbuildBuilding({
+          const buildOutput = esbuildBuilding({
             sourceFilePath: sourceFilePath,
             outputFilePath: path.join(outputDir, `${fileName}.js`),
             buildOptions: {
@@ -519,17 +526,13 @@ async function build(
           });
 
           // post-build linting
-          const builtFileText = fs.readFileSync(outputFilePath, "utf8");
-
-          await lintHelper({
+          await lintNestedFiles(
+            buildOutput.nestedLocalImports,
             codeType,
-            sourceText: builtFileText,
-            config,
-            lintJs: true,
-            debugSource: outputFilePath,
-          });
+            config
+          );
 
-          return outputFilePath;
+          return buildOutput.outputFilePath;
         }
 
         default:
@@ -560,6 +563,38 @@ type LintHelperArgsForTextType = {
   config: AssetHelperConfig | AppSyncAssetHelperConfigBase;
 };
 
+export async function lintNestedFiles(
+  nestedLocalImports: string[],
+  codeType: string,
+  config: AssetHelperConfig | AppSyncAssetHelperConfigBase
+) {
+  const nestImportLintFailures: string[] = [];
+
+  for (const nestedImport of nestedLocalImports) {
+    try {
+      const builtFileText = fs.readFileSync(nestedImport, "utf8");
+
+      await lintHelper({
+        codeType,
+        sourceText: builtFileText,
+        config,
+        lintJs: false,
+        debugSource: nestedImport,
+      });
+    } catch (e: unknown) {
+      nestImportLintFailures.push((e as Error).message);
+    }
+  }
+
+  if (nestImportLintFailures.length > 0) {
+    const m = `${
+      nestImportLintFailures.length
+    } nested file(s) have errors. \n\n${nestImportLintFailures.join("\n\n")}`;
+
+    throw new Error(m);
+  }
+}
+
 async function lintHelper(args: LintHelperArgsType) {
   const lintSourceConfig = args.sourceFilePath
     ? {
@@ -579,7 +614,7 @@ async function lintHelper(args: LintHelperArgsType) {
     });
 
     if (result !== false) {
-      const errorMessage = `The source file was not built successfully: ${args.sourceFilePath}\n\n${result}\n\nSource File: ${args.debugSource}\n\n\n\n`;
+      const errorMessage = `The source file was not built successfully: ${args.debugSource}\n\n${result}\n\n`;
       throw new Error(errorMessage);
     }
   } else {
@@ -591,7 +626,7 @@ async function lintHelper(args: LintHelperArgsType) {
     });
 
     if (result !== false) {
-      const errorMessage = `The source file was not built successfully: ${args.sourceFilePath}\n\n${result}\n\nSource File: ${args.debugSource}\n\n\n\n`;
+      const errorMessage = `The source file was not built successfully: ${args.debugSource}\n\n${result}\n\n`;
       throw new Error(errorMessage);
     }
   }
