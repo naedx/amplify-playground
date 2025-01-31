@@ -127,60 +127,62 @@ async function fromAssetHelper(
   // The docker build mode (DISABLED. See above.):
   //     1. copies the file from the mapped input directory to the mapped output directory.
 
-  if (!fs.existsSync(sourceFilePath)) {
-    throw new Error(`The source file does not exist: ${sourceFilePath}`);
-  }
+  try {
+    if (!fs.existsSync(sourceFilePath)) {
+      throw new Error(`The source file does not exist: ${sourceFilePath}`);
+    }
 
-  const builtSourcePath = await build(config, sourceFilePath, codeType);
+    const builtSourcePath = await build(config, sourceFilePath, codeType);
 
-  if (!fs.existsSync(builtSourcePath)) {
-    throw new Error(
-      `The source file was not built successfully: ${sourceFilePath}`
-    );
-  }
+    if (!fs.existsSync(builtSourcePath)) {
+      throw new Error(`The source file was not found: ${sourceFilePath}`);
+    }
 
-  if (returnAsString) {
-    return fs.readFileSync(builtSourcePath, "utf8");
-  }
+    if (returnAsString) {
+      return fs.readFileSync(builtSourcePath, "utf8");
+    }
 
-  const code = codeType === "lambda" ? LambdaCode : AppSyncCode;
+    const code = codeType === "lambda" ? LambdaCode : AppSyncCode;
 
-  const asset = code.fromAsset(path.dirname(builtSourcePath), {
-    bundling: {
-      image: LambdaRuntime.NODEJS_20_X.bundlingImage,
-      command: [
-        "node",
-        "-e",
-        `require('node:fs').copyFileSync("/asset-input/${path.basename(
-          builtSourcePath
-        )}", 
-        "/asset-output/index.js")`,
-      ],
-      outputType:
-        codeType === "appsync" ? BundlingOutput.SINGLE_FILE : undefined,
-      local: {
-        tryBundle(outputDir: string) {
-          // create output directory if it doesn't yet exist
-          if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+    const asset = code.fromAsset(path.dirname(builtSourcePath), {
+      bundling: {
+        image: LambdaRuntime.NODEJS_20_X.bundlingImage,
+        command: [
+          "node",
+          "-e",
+          `require('node:fs').copyFileSync("/asset-input/${path.basename(
+            builtSourcePath
+          )}", 
+          "/asset-output/index.js")`,
+        ],
+        outputType:
+          codeType === "appsync" ? BundlingOutput.SINGLE_FILE : undefined,
+        local: {
+          tryBundle(outputDir: string) {
+            // create output directory if it doesn't yet exist
+            if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
 
-          try {
-            //copy the built file to the output directory
-            fs.copyFileSync(
-              builtSourcePath,
-              path.join(outputDir, path.basename(builtSourcePath))
-            );
-          } catch (ex) {
-            console.error("Error copying built file to output: ", ex);
-            throw ex; // rethrow error to prevent falling back to the docker build mode
-          }
+            try {
+              //copy the built file to the output directory
+              fs.copyFileSync(
+                builtSourcePath,
+                path.join(outputDir, path.basename(builtSourcePath))
+              );
+            } catch (ex) {
+              console.error("Error copying built file to output: ", ex);
+              throw ex; // rethrow error to prevent falling back to the docker build mode
+            }
 
-          return true;
+            return true;
+          },
         },
       },
-    },
-  });
+    });
 
-  return asset;
+    return asset;
+  } catch (e: unknown) {
+    throw new Error((e as Error).message);
+  }
 }
 
 export interface AssetHelperConfig {
@@ -337,21 +339,28 @@ export const esLinting = async (
       ...lintResults.messages,
       ...lintResults.suppressedMessages,
     ].map((m) => {
+      let errorMessage = "";
+
       if (m.ruleId !== null) {
-        let errorMessage = `Severity: ${m.severity}\n`;
-        errorMessage += `Rule: ${m.ruleId}\n`;
-        errorMessage += `Message: ${m.message}\n`;
+        errorMessage = `:: Lint Rule Error ::\n`;
+      } else if (m.fatal) {
+        errorMessage = `:: Fatal Error ::\n`;
+      } else {
+        errorMessage = `:: Error ::\n`;
+      }
+
+      if (m.ruleId) errorMessage += `Rule: ${m.ruleId}\n`;
+      if (m.severity) errorMessage += `Severity: ${m.severity}\n`;
+      if (m.message) errorMessage += `Message: ${m.message}\n`;
+      if (m.line)
         errorMessage += `Location: line ${m.line}:${m.column} ${
           m.endLine && m.endColumn ? "to " + m.endLine + ":" + m.endColumn : ""
         }\n`;
-        if (m.fix) errorMessage += `Fix: ${m.fix.text}.`;
+      if (m.fix) errorMessage += `Fix: ${m.fix.text}.`;
+      if (m.suggestions)
+        errorMessage += `Suggestion(s): ${m.suggestions.join(". ")}.`;
 
-        return errorMessage;
-      } else if (m.fatal) {
-        return `Fatal error: ${m.message}`;
-      } else {
-        return `Error: ${m.message}`;
-      }
+      return errorMessage;
     });
 
     const fullErrorMessage = `${
@@ -604,7 +613,7 @@ async function lintHelper(args: LintHelperArgsType) {
     });
 
     if (result !== false) {
-      const errorMessage = `The source file was not built successfully: ${args.debugSource}\n\n${result}\n\n`;
+      const errorMessage = `The AppSync source file was not built successfully (2): ${args.debugSource}\n\n${result}\n\n`;
       throw new Error(errorMessage);
     }
   } else {
@@ -616,7 +625,7 @@ async function lintHelper(args: LintHelperArgsType) {
     });
 
     if (result !== false) {
-      const errorMessage = `The source file was not built successfully: ${args.debugSource}\n\n${result}\n\n`;
+      const errorMessage = `The Lambda source file was not built successfully (3): ${args.debugSource}\n\n${result}\n\n`;
       throw new Error(errorMessage);
     }
   }
