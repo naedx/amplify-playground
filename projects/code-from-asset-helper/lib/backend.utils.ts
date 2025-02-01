@@ -298,7 +298,10 @@ export const esbuildBuilding = (options: {
   };
 };
 
-export type EsLintingArgsType = EsLintingFilesArgsType | EsLintingTextArgsType;
+export type EsLintingArgsType = (
+  | EsLintingFilesArgsType
+  | EsLintingTextArgsType
+) & { debugSource: string };
 
 export type EsLintingFilesArgsType = {
   source: "appsync" | "lambda";
@@ -353,7 +356,7 @@ export const esLinting = async (
       if (m.severity) errorMessage += `Severity: ${m.severity}\n`;
       if (m.message) errorMessage += `Message: ${m.message}\n`;
       if (m.line)
-        errorMessage += `Location: line ${m.line}:${m.column} ${
+        errorMessage += `Location: ${args.debugSource}:${m.line}:${m.column} ${
           m.endLine && m.endColumn ? "to " + m.endLine + ":" + m.endColumn : ""
         }\n`;
       if (m.fix) errorMessage += `Fix: ${m.fix.text}.`;
@@ -608,24 +611,24 @@ async function lintHelper(args: LintHelperArgsType) {
     const result = await esLinting({
       source: "appsync",
       overrideEslintConfig: args.config.overrideEslintConfig,
-
+      debugSource: args.debugSource,
       ...lintSourceConfig,
     });
 
     if (result !== false) {
-      const errorMessage = `The AppSync source file was not built successfully (2): ${args.debugSource}\n\n${result}\n\n`;
+      const errorMessage = `The AppSync source file was not built successfully: ${args.debugSource}\n\n${result}\n\n`;
       throw new Error(errorMessage);
     }
   } else {
     const result = await esLinting({
       source: "lambda",
       overrideEslintConfig: args.config.overrideEslintConfig,
-
+      debugSource: args.debugSource,
       ...lintSourceConfig,
     });
 
     if (result !== false) {
-      const errorMessage = `The Lambda source file was not built successfully (3): ${args.debugSource}\n\n${result}\n\n`;
+      const errorMessage = `The Lambda source file was not built successfully: ${args.debugSource}\n\n${result}\n\n`;
       throw new Error(errorMessage);
     }
   }

@@ -29,6 +29,7 @@ describe("appsync builder", () => {
             },
           },
         },
+        debugSource: sourceFilePath,
       });
 
       if (lintResult !== false) {
@@ -54,6 +55,7 @@ describe("appsync builder", () => {
           },
         },
       },
+      debugSource: sourceFilePath,
     });
 
     //AppSync function build
@@ -106,6 +108,7 @@ describe("appsync builder", () => {
           },
         },
       },
+      debugSource: sourceFilePath,
     });
 
     const outFile = tsTranspiling(
@@ -140,6 +143,7 @@ test("esbuild should detect errors in nested files", async () => {
     source: "appsync",
     sourceFilePath,
     overrideEslintConfig: overrideConfig,
+    debugSource: sourceFilePath,
   });
 
   //AppSync function build
