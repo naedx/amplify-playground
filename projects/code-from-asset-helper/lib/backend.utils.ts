@@ -41,6 +41,8 @@ import globals from "globals";
  *
  * @param {BuildMode} config.tsTranspileOptions - The build options for TypeScript transpiler. Only used if buildMode is set to Typescript.
  *
+ * @param {BuildMode} config.overrideEslintConfig - These options are passed to ESLint.Options.overrideConfig
+ *
  * @returns A lambda Code object (aliased as LambdaCode)
  */
 export async function lambdaCodeFromAssetHelper(
