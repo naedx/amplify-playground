@@ -1,10 +1,11 @@
 {
+  "extends": "@tsconfig/node20/tsconfig.json",
+  "include": ["**/*.ts", "**/*.mjs", "eslint.config.mjs"],
   "compilerOptions": {
-    "types": [
-      "node"
-    ],
-    "target": "ES2020",
-    "module": "commonjs",
+    "types": ["node"],
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "declaration": true,
     "outDir": "./dist",
     "esModuleInterop": true,

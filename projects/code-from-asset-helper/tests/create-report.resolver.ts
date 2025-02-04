@@ -1,6 +1,6 @@
 import { Context, util } from "@aws-appsync/utils";
 import { CreateModelMetaData, getLoggedInUserId } from "./helpers";
-import { addition } from "./utils.fail.resolver";
+import { addition } from "./utils.fail.resolver"; // This nested function should fail linting
 
 export function request(ctx: Context<{ input: object }>) {
   const metaData: CreateModelMetaData = {
@@ -22,7 +22,9 @@ export function request(ctx: Context<{ input: object }>) {
   };
 }
 
-export function response(ctx: Context) {
+export function response(
+  ctx: Context<unknown, Record<string, unknown>, undefined, undefined, unknown>
+) {
   if (ctx.error) {
     util.error(ctx.error.message, ctx.error.type);
   }

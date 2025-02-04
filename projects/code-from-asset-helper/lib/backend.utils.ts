@@ -21,10 +21,6 @@ import {
   TranspileOptions as TSTranspileOptions,
 } from "typescript";
 
-import eslint from "@eslint/js";
-
-import appsyncPlugin from "@aws-appsync/eslint-plugin";
-
 import { BundlingOutput } from "aws-cdk-lib/core";
 
 import globals from "globals";
@@ -361,7 +357,12 @@ export const esLinting = async (
         }\n`;
       if (m.fix) errorMessage += `Fix: ${m.fix.text}.`;
       if (m.suggestions)
-        errorMessage += `Suggestion(s): ${m.suggestions.join(". ")}.`;
+        errorMessage += `Suggestion(s): \n${m.suggestions
+          .map(
+            (e) =>
+              `  ${e.desc} Col ${e.fix.range[0]}-${e.fix.range[1]} '${e.fix.text}'`
+          )
+          .join("\n")}.`;
 
       return errorMessage;
     });
@@ -377,10 +378,6 @@ export const esLinting = async (
 };
 
 function getEslintBaseConfig(source: "appsync" | "lambda"): ESLint.Options {
-  const baseConfigs = tseslint.config(
-    ...[eslint.configs.recommended, tseslint.configs.recommended]
-  ) as Linter.Config[];
-
   return source === "appsync"
     ? {
         // plugins: {
@@ -399,8 +396,12 @@ function getEslintBaseConfig(source: "appsync" | "lambda"): ESLint.Options {
               },
             },
           },
-          ...baseConfigs,
-          appsyncPlugin.configs?.recommended as Linter.Config,
+          ...(tseslint
+            .config
+            // eslint.configs.recommended,
+            // tseslint.configs.recommendedTypeCheckedOnly,
+            // appsyncPlugin.configs?.recommended as Linter.Config
+            () as Linter.Config[]),
         ],
       }
     : {
@@ -420,7 +421,11 @@ function getEslintBaseConfig(source: "appsync" | "lambda"): ESLint.Options {
               },
             },
           },
-          ...(baseConfigs as Linter.Config[]),
+          ...(tseslint
+            .config
+            // eslint.configs.recommended,
+            // tseslint.configs.recommendedTypeCheckedOnly
+            () as Linter.Config[]),
         ],
       };
 }
@@ -478,11 +483,6 @@ async function build(
         target: "esnext",
       };
 
-      // const eslintPluginConfig = {
-      //   baseConfig: getEslintBaseConfig(codeType),
-      //   overrideConfig: config.overrideEslintConfig,
-      // };
-
       switch (codeType) {
         case "lambda": {
           const buildOutput = esbuildBuilding({
@@ -495,7 +495,6 @@ async function build(
               outExtension: {
                 ".js": ".cjs",
               },
-              // plugins: [eslintPlugin(eslintPluginConfig as ESLint.Options)], // perform linting of build artifacts
               ...esConfig.esBuildOptions, // apply user defined overrides
             },
           });
@@ -522,7 +521,6 @@ async function build(
                 "@aws-sdk/client-s3",
                 "@aws-sdk/s3-request-presigner",
               ],
-              // plugins: [eslintPlugin(eslintPluginConfig as ESLint.Options)], // perform linting of build artifacts
               ...esConfig.esBuildOptions, // apply user defined overrides
             },
           });
@@ -534,15 +532,23 @@ async function build(
             config
           );
 
+          //relint the built resolver file
+          await lintHelper({
+            codeType,
+            sourceFilePath: buildOutput.outputFilePath,
+            config,
+            debugSource: buildOutput.outputFilePath,
+          });
+
           return buildOutput.outputFilePath;
         }
 
         default:
-          throw new Error(`Invalid value for 'codeType': ${codeType}`);
+          throw new Error(`Invalid value for 'codeType'`);
       }
     }
     default:
-      throw new Error(`Invalid value for 'buildMode': ${config.buildMode}`);
+      throw new Error(`Invalid value for 'buildMode'`);
   }
 }
 
@@ -574,24 +580,24 @@ export async function lintNestedFiles(
 
   for (const nestedImport of nestedLocalImports) {
     try {
-      const builtFileText = fs.readFileSync(nestedImport, "utf8");
+      // const builtFileText = fs.readFileSync(nestedImport, "utf8");
 
       await lintHelper({
         codeType,
-        sourceText: builtFileText,
+        sourceFilePath: nestedImport,
         config,
 
         debugSource: nestedImport,
       });
     } catch (e: unknown) {
-      nestImportLintFailures.push((e as Error).message);
+      nestImportLintFailures.push(`\n${(e as Error).message}`);
     }
   }
 
   if (nestImportLintFailures.length > 0) {
     const m = `${
       nestImportLintFailures.length
-    } nested file(s) have errors. \n\n${nestImportLintFailures.join("\n\n")}`;
+    } nested file(s) have errors. \n\n ${nestImportLintFailures.join("\n\n")}`;
 
     throw new Error(m);
   }
