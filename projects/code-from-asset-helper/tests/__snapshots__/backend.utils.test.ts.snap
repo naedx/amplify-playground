@@ -1,0 +1,139 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`appsync builder > esbuild should detect errors in nested files 1`] = `
+[Error: 2 nested file(s) have errors. 
+
+ 
+The AppSync source file was not built successfully: tests/helpers.ts
+
+3 linting error(s) found:: 
+
+:: Lint Rule Error ::
+Rule: @typescript-eslint/no-explicit-any
+Severity: 2
+Message: Unexpected any. Specify a different type.
+Location: tests/helpers.ts:6:13 to 6:16
+Suggestion(s): 
+  Use \`unknown\` instead, this will force you to explicitly, and safely assert the type is correct. Col 256-259 'unknown'
+  Use \`never\` instead, this is useful when instantiating generic type parameters that you don't need to know the type of. Col 256-259 'never'.
+
+:: Lint Rule Error ::
+Rule: @typescript-eslint/no-unsafe-member-access
+Severity: 2
+Message: Unsafe member access .sub on an \`any\` value.
+Location: tests/helpers.ts:8:28 to 8:31
+
+
+:: Lint Rule Error ::
+Rule: @typescript-eslint/no-unsafe-member-access
+Severity: 2
+Message: Unsafe member access .username on an \`any\` value.
+Location: tests/helpers.ts:8:44 to 8:52
+
+
+
+
+
+
+
+
+The AppSync source file was not built successfully: tests/utils.fail.resolver.ts
+
+3 linting error(s) found:: 
+
+:: Lint Rule Error ::
+Rule: @aws-appsync/no-async
+Severity: 2
+Message: Async functions are not supported.
+Location: tests/utils.fail.resolver.ts:1:8 to 4:2
+
+
+:: Lint Rule Error ::
+Rule: @typescript-eslint/require-await
+Severity: 2
+Message: Async function 'addition' has no 'await' expression.
+Location: tests/utils.fail.resolver.ts:1:8 to 1:31
+Suggestion(s): 
+  Remove 'async'. Col 7-69 'function addition(a: number, b: number): number'.
+
+:: Lint Rule Error ::
+Rule: @typescript-eslint/no-unused-vars
+Severity: 2
+Message: 'c' is assigned a value but never used.
+Location: tests/utils.fail.resolver.ts:2:9 to 2:10
+
+
+
+
+
+]
+`;
+
+exports[`appsync builder > full asset helper should detect lint errors 1`] = `
+[Error: 2 nested file(s) have errors. 
+
+ 
+The AppSync source file was not built successfully: tests/helpers.ts
+
+3 linting error(s) found:: 
+
+:: Lint Rule Error ::
+Rule: @typescript-eslint/no-explicit-any
+Severity: 2
+Message: Unexpected any. Specify a different type.
+Location: tests/helpers.ts:6:13 to 6:16
+Suggestion(s): 
+  Use \`unknown\` instead, this will force you to explicitly, and safely assert the type is correct. Col 256-259 'unknown'
+  Use \`never\` instead, this is useful when instantiating generic type parameters that you don't need to know the type of. Col 256-259 'never'.
+
+:: Lint Rule Error ::
+Rule: @typescript-eslint/no-unsafe-member-access
+Severity: 2
+Message: Unsafe member access .sub on an \`any\` value.
+Location: tests/helpers.ts:8:28 to 8:31
+
+
+:: Lint Rule Error ::
+Rule: @typescript-eslint/no-unsafe-member-access
+Severity: 2
+Message: Unsafe member access .username on an \`any\` value.
+Location: tests/helpers.ts:8:44 to 8:52
+
+
+
+
+
+
+
+
+The AppSync source file was not built successfully: tests/utils.fail.resolver.ts
+
+3 linting error(s) found:: 
+
+:: Lint Rule Error ::
+Rule: @aws-appsync/no-async
+Severity: 2
+Message: Async functions are not supported.
+Location: tests/utils.fail.resolver.ts:1:8 to 4:2
+
+
+:: Lint Rule Error ::
+Rule: @typescript-eslint/require-await
+Severity: 2
+Message: Async function 'addition' has no 'await' expression.
+Location: tests/utils.fail.resolver.ts:1:8 to 1:31
+Suggestion(s): 
+  Remove 'async'. Col 7-69 'function addition(a: number, b: number): number'.
+
+:: Lint Rule Error ::
+Rule: @typescript-eslint/no-unused-vars
+Severity: 2
+Message: 'c' is assigned a value but never used.
+Location: tests/utils.fail.resolver.ts:2:9 to 2:10
+
+
+
+
+
+]
+`;
