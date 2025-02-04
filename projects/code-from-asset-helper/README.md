@@ -114,7 +114,7 @@ backend.data.addResolver("createTodo", {
 
 ESLint is called on the target source file as well as each its nested import files. Linting rules are picked up from your eslint configuration file (eg. eslint.config.mjs) in your project. Assuming that you are working with Lambda (node) and AppSync resolvers (AppSync_JS) then you will want a set of rules that constrains your code to what is available to the respective runtime environments.
 
-The following configures linting for a project that contains source for both environments. As such, the project uses the convention of suffixing AppSync resolvers with `*.resolver.ts` and Lambda code with `*.lambda.ts`. This allows the eslint rules to apply the contraints appropriately.
+The following configures linting for a project that contains source for both environments. As such, the project uses the convention of suffixing AppSync resolvers with `*.resolver.ts` and Lambda code with `*.lambda.ts`. This allows the eslint rules to apply the contraints appropriately. (For your project, you may choose instead to identify your AppSync/Lambda code based on directory path. Modify the glob patterns as necessary to reflect this.)
 
 The config below also bans importing `*.resolver.ts` code in `*.lambda.ts` scripts and vice versa.
 
@@ -260,6 +260,7 @@ const rulesNoUnusedVarsConfig = {
 ### v1.x > v2.x:
 
 - Upgrades eslint from v8 to v9. Eslint's FlatConfig is now required.
+- The code from asset helpers no longer include the default configs but instead relies on your eslint config file (eslint.config.mjs).
 
 ## License
 
