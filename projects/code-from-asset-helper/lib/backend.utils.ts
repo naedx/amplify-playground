@@ -9,6 +9,8 @@ import path from "path";
 
 import os from "os";
 
+import tseslint from "typescript-eslint";
+
 import { buildSync, BuildOptions as ESBuildOptions } from "esbuild";
 import { ESLint, Linter } from "eslint";
 import fs from "fs";
@@ -19,8 +21,9 @@ import {
   TranspileOptions as TSTranspileOptions,
 } from "typescript";
 
-import appSyncESlintPlugin from "@aws-appsync/eslint-plugin";
 import { BundlingOutput } from "aws-cdk-lib/core";
+
+import globals from "globals";
 
 /**
  * This utility function is used to create a lambda Code object (aliased as LambdaCode) from a local file.
@@ -37,6 +40,8 @@ import { BundlingOutput } from "aws-cdk-lib/core";
  * @param {BuildMode} config.esBuildOptions - The build options for esbuild. Only used if buildMode is set to Esbuild.
  *
  * @param {BuildMode} config.tsTranspileOptions - The build options for TypeScript transpiler. Only used if buildMode is set to Typescript.
+ *
+ * @param {BuildMode} config.overrideEslintConfig - These options are passed to ESLint.Options.overrideConfig
  *
  * @returns A lambda Code object (aliased as LambdaCode)
  */
@@ -120,60 +125,62 @@ async function fromAssetHelper(
   // The docker build mode (DISABLED. See above.):
   //     1. copies the file from the mapped input directory to the mapped output directory.
 
-  if (!fs.existsSync(sourceFilePath)) {
-    throw new Error(`The source file does not exist: ${sourceFilePath}`);
-  }
+  try {
+    if (!fs.existsSync(sourceFilePath)) {
+      throw new Error(`The source file does not exist: ${sourceFilePath}`);
+    }
 
-  const builtSourcePath = await build(config, sourceFilePath, codeType);
+    const builtSourcePath = await build(config, sourceFilePath, codeType);
 
-  if (!fs.existsSync(builtSourcePath)) {
-    throw new Error(
-      `The source file was not built successfully: ${sourceFilePath}`
-    );
-  }
+    if (!fs.existsSync(builtSourcePath)) {
+      throw new Error(`The source file was not found: ${sourceFilePath}`);
+    }
 
-  if (returnAsString) {
-    return fs.readFileSync(builtSourcePath, "utf8");
-  }
+    if (returnAsString) {
+      return fs.readFileSync(builtSourcePath, "utf8");
+    }
 
-  const code = codeType === "lambda" ? LambdaCode : AppSyncCode;
+    const code = codeType === "lambda" ? LambdaCode : AppSyncCode;
 
-  const asset = code.fromAsset(path.dirname(builtSourcePath), {
-    bundling: {
-      image: LambdaRuntime.NODEJS_20_X.bundlingImage,
-      command: [
-        "node",
-        "-e",
-        `require('node:fs').copyFileSync("/asset-input/${path.basename(
-          builtSourcePath
-        )}", 
-        "/asset-output/index.js")`,
-      ],
-      outputType:
-        codeType === "appsync" ? BundlingOutput.SINGLE_FILE : undefined,
-      local: {
-        tryBundle(outputDir: string) {
-          // create output directory if it doesn't yet exist
-          if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
+    const asset = code.fromAsset(path.dirname(builtSourcePath), {
+      bundling: {
+        image: LambdaRuntime.NODEJS_20_X.bundlingImage,
+        command: [
+          "node",
+          "-e",
+          `require('node:fs').copyFileSync("/asset-input/${path.basename(
+            builtSourcePath
+          )}", 
+          "/asset-output/index.js")`,
+        ],
+        outputType:
+          codeType === "appsync" ? BundlingOutput.SINGLE_FILE : undefined,
+        local: {
+          tryBundle(outputDir: string) {
+            // create output directory if it doesn't yet exist
+            if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir);
 
-          try {
-            //copy the built file to the output directory
-            fs.copyFileSync(
-              builtSourcePath,
-              path.join(outputDir, path.basename(builtSourcePath))
-            );
-          } catch (ex) {
-            console.error("Error copying built file to output: ", ex);
-            throw ex; // rethrow error to prevent falling back to the docker build mode
-          }
+            try {
+              //copy the built file to the output directory
+              fs.copyFileSync(
+                builtSourcePath,
+                path.join(outputDir, path.basename(builtSourcePath))
+              );
+            } catch (ex) {
+              console.error("Error copying built file to output: ", ex);
+              throw ex; // rethrow error to prevent falling back to the docker build mode
+            }
 
-          return true;
+            return true;
+          },
         },
       },
-    },
-  });
+    });
 
-  return asset;
+    return asset;
+  } catch (e: unknown) {
+    throw new Error((e as Error).message);
+  }
 }
 
 export interface AssetHelperConfig {
@@ -260,65 +267,106 @@ export const esbuildBuilding = (options: {
   sourceFilePath: string;
   outputFilePath: string;
   buildOptions?: ESBuildOptions;
-}): string => {
+}): { outputFilePath: string; nestedLocalImports: string[] } => {
   // Build the source file with esbuild and write it to the output directory
   // as a CommonJS module
 
-  buildSync({
+  const buildResult = buildSync({
     outfile: options.outputFilePath,
     entryPoints: [options.sourceFilePath],
+    metafile: true,
     ...options.buildOptions,
   });
 
-  return options.outputFilePath;
+  const nestedImports = Object.entries(buildResult.metafile?.inputs ?? {})
+    .filter(function (entry) {
+      const [key] = entry;
+
+      return (
+        key.includes("node_modules") === false &&
+        key.endsWith(".ts") &&
+        key.endsWith("generated.ts") === false
+      );
+    })
+    .map((e) => e[0]);
+
+  return {
+    nestedLocalImports: nestedImports,
+    outputFilePath: options.outputFilePath,
+  };
 };
 
-export const esLinting = async (args: {
+export type EsLintingArgsType = (
+  | EsLintingFilesArgsType
+  | EsLintingTextArgsType
+) & { debugSource: string };
+
+export type EsLintingFilesArgsType = {
   source: "appsync" | "lambda";
   sourceFilePath: string;
-  // tsConfig: string;
   overrideEslintConfig?: OverridesConfigType;
-}): Promise<string | false> => {
+};
+
+export type EsLintingTextArgsType = {
+  source: "appsync" | "lambda";
+  sourceText: string;
+  overrideEslintConfig?: OverridesConfigType;
+};
+
+export const esLinting = async (
+  args: EsLintingArgsType
+): Promise<string | false> => {
   //setup base config for appsync or lambda
-  const baseConfig =
-    args.source === "appsync"
-      ? (appSyncESlintPlugin.configs?.recommended as Linter.Config)
-      : {
-          extends: [
-            "eslint:recommended",
-            "plugin:@typescript-eslint/eslint-recommended",
-            "plugin:@typescript-eslint/recommended",
-          ],
-          plugins: ["@typescript-eslint"],
-        };
 
   const eslint = new ESLint({
-    baseConfig,
+    ...getEslintBaseConfig(args.source),
     overrideConfig: args.overrideEslintConfig,
   });
 
-  const lintResults = (await eslint.lintFiles([args.sourceFilePath]))[0];
+  let lintResults: ESLint.LintResult;
+
+  if ((args as EsLintingFilesArgsType).sourceFilePath !== undefined) {
+    const argsAsFiles = args as EsLintingFilesArgsType;
+
+    lintResults = (await eslint.lintFiles([argsAsFiles.sourceFilePath]))[0];
+  } else {
+    const argsAsText = args as EsLintingTextArgsType;
+
+    lintResults = (await eslint.lintText(argsAsText.sourceText))[0];
+  }
 
   if (lintResults.errorCount > 0) {
     const messages = [
       ...lintResults.messages,
       ...lintResults.suppressedMessages,
     ].map((m) => {
+      let errorMessage = "";
+
       if (m.ruleId !== null) {
-        let errorMessage = `Severity: ${m.severity}\n`;
-        errorMessage += `Rule: ${m.ruleId}\n`;
-        errorMessage += `Message: ${m.message}\n`;
-        errorMessage += `Location: line ${m.line}:${m.column} ${
+        errorMessage = `:: Lint Rule Error ::\n`;
+      } else if (m.fatal) {
+        errorMessage = `:: Fatal Error ::\n`;
+      } else {
+        errorMessage = `:: Error ::\n`;
+      }
+
+      if (m.ruleId) errorMessage += `Rule: ${m.ruleId}\n`;
+      if (m.severity) errorMessage += `Severity: ${m.severity}\n`;
+      if (m.message) errorMessage += `Message: ${m.message}\n`;
+      if (m.line)
+        errorMessage += `Location: ${args.debugSource}:${m.line}:${m.column} ${
           m.endLine && m.endColumn ? "to " + m.endLine + ":" + m.endColumn : ""
         }\n`;
-        if (m.fix) errorMessage += `Fix: ${m.fix.text}.`;
+      if (m.fix) errorMessage += `Fix: ${m.fix.text}.`;
+      if (m.suggestions)
+        errorMessage += `Suggestion(s): \n${m.suggestions
+          .map(
+            (e) =>
+              `  ${e.desc} Col ${e.fix.range[0]}-${e.fix.range[1]} '${e.fix.text}'`
+          )
+          .join("\n")}.`;
 
-        return errorMessage;
-      } else if (m.fatal) {
-        return `Fatal error: ${m.message}`;
-      } else {
-        return `Error: ${m.message}`;
-      }
+      return errorMessage;
     });
 
     const fullErrorMessage = `${
@@ -330,6 +378,59 @@ export const esLinting = async (args: {
 
   return false;
 };
+
+function getEslintBaseConfig(source: "appsync" | "lambda"): ESLint.Options {
+  return source === "appsync"
+    ? {
+        // plugins: {
+        //   "@typescript-eslint": tseslintPlugin,
+        // },
+        baseConfig: [
+          {
+            languageOptions: {
+              globals: {
+                ...globals.node,
+              },
+              parserOptions: {
+                projectService: {
+                  allowDefaultProject: ["__placeholder__.js"],
+                },
+              },
+            },
+          },
+          ...(tseslint
+            .config
+            // eslint.configs.recommended,
+            // tseslint.configs.recommendedTypeCheckedOnly,
+            // appsyncPlugin.configs?.recommended as Linter.Config
+            () as Linter.Config[]),
+        ],
+      }
+    : {
+        // plugins: {
+        //   "@typescript-eslint": tseslintPlugin,
+        // },
+        baseConfig: [
+          {
+            languageOptions: {
+              globals: {
+                ...globals.node,
+              },
+              parserOptions: {
+                projectService: {
+                  allowDefaultProject: ["__placeholder__.js"],
+                },
+              },
+            },
+          },
+          ...(tseslint
+            .config
+            // eslint.configs.recommended,
+            // tseslint.configs.recommendedTypeCheckedOnly
+            () as Linter.Config[]),
+        ],
+      };
+}
 
 async function build(
   config: AssetHelperConfig | AppSyncAssetHelperConfigBase,
@@ -346,38 +447,18 @@ async function build(
 
   if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
 
-  let fileName = "index";
+  const fileName =
+    codeType === "appsync"
+      ? path.basename(sourceFilePath).replace(path.extname(sourceFilePath), "")
+      : "index";
 
-  if (codeType === "appsync") {
-    //perform linting if the code is for AppSync
-    const result = await esLinting({
-      source: "appsync",
-      sourceFilePath,
-      // tsConfig: (config as AppSyncAssetHelperConfigBase).tsConfig,
-      overrideEslintConfig: config.overrideEslintConfig,
-    });
-
-    if (result !== false) {
-      const errorMessage = `The source file was not built successfully: ${sourceFilePath}\n\n${result}`;
-      throw new Error(errorMessage);
-    }
-
-    fileName = path
-      .basename(sourceFilePath)
-      .replace(path.extname(sourceFilePath), ""); // get file name without extension
-  } else {
-    const result = await esLinting({
-      source: "lambda",
-      sourceFilePath,
-      // tsConfig: config.tsConfig,
-      overrideEslintConfig: config.overrideEslintConfig,
-    });
-
-    if (result !== false) {
-      const errorMessage = `The source file was not built successfully: ${sourceFilePath}\n\n${result}`;
-      throw new Error(errorMessage);
-    }
-  }
+  //pre-build linting
+  await lintHelper({
+    codeType,
+    sourceFilePath,
+    config,
+    debugSource: sourceFilePath,
+  });
 
   switch (config.buildMode) {
     case BuildMode.Off: {
@@ -406,7 +487,7 @@ async function build(
 
       switch (codeType) {
         case "lambda": {
-          return esbuildBuilding({
+          const buildOutput = esbuildBuilding({
             sourceFilePath: sourceFilePath,
             outputFilePath: path.join(outputDir, `${fileName}.cjs`),
             buildOptions: {
@@ -419,10 +500,19 @@ async function build(
               ...esConfig.esBuildOptions, // apply user defined overrides
             },
           });
+
+          // post-build linting
+          await lintNestedFiles(
+            buildOutput.nestedLocalImports,
+            codeType,
+            config
+          );
+
+          return buildOutput.outputFilePath;
         }
 
         case "appsync": {
-          return esbuildBuilding({
+          const buildOutput = esbuildBuilding({
             sourceFilePath: sourceFilePath,
             outputFilePath: path.join(outputDir, `${fileName}.js`),
             buildOptions: {
@@ -436,14 +526,119 @@ async function build(
               ...esConfig.esBuildOptions, // apply user defined overrides
             },
           });
+
+          // post-build linting
+          await lintNestedFiles(
+            buildOutput.nestedLocalImports,
+            codeType,
+            config
+          );
+
+          //relint the built resolver file
+          await lintHelper({
+            codeType,
+            sourceFilePath: buildOutput.outputFilePath,
+            config,
+            debugSource: buildOutput.outputFilePath,
+          });
+
+          return buildOutput.outputFilePath;
         }
 
         default:
-          throw new Error(`Invalid value for 'codeType': ${codeType}`);
+          throw new Error(`Invalid value for 'codeType'`);
       }
     }
     default:
-      throw new Error(`Invalid value for 'buildMode': ${config.buildMode}`);
+      throw new Error(`Invalid value for 'buildMode'`);
+  }
+}
+
+type LintHelperArgsType = (
+  | LintHelperArgsForFileType
+  | LintHelperArgsForTextType
+) & { debugSource: string };
+
+type LintHelperArgsForFileType = {
+  codeType: string;
+  sourceFilePath: string;
+  sourceText?: string;
+  config: AssetHelperConfig | AppSyncAssetHelperConfigBase;
+};
+
+type LintHelperArgsForTextType = {
+  codeType: string;
+  sourceFilePath?: string;
+  sourceText: string;
+  config: AssetHelperConfig | AppSyncAssetHelperConfigBase;
+};
+
+export async function lintNestedFiles(
+  nestedLocalImports: string[],
+  codeType: string,
+  config: AssetHelperConfig | AppSyncAssetHelperConfigBase
+) {
+  const nestImportLintFailures: string[] = [];
+
+  for (const nestedImport of nestedLocalImports) {
+    try {
+      // const builtFileText = fs.readFileSync(nestedImport, "utf8");
+
+      await lintHelper({
+        codeType,
+        sourceFilePath: nestedImport,
+        config,
+
+        debugSource: nestedImport,
+      });
+    } catch (e: unknown) {
+      nestImportLintFailures.push(`\n${(e as Error).message}`);
+    }
+  }
+
+  if (nestImportLintFailures.length > 0) {
+    const m = `${
+      nestImportLintFailures.length
+    } nested file(s) have errors. \n\n ${nestImportLintFailures.join("\n\n")}`;
+
+    throw new Error(m);
+  }
+}
+
+async function lintHelper(args: LintHelperArgsType) {
+  const lintSourceConfig = args.sourceFilePath
+    ? {
+        sourceFilePath: (args as LintHelperArgsForFileType).sourceFilePath,
+      }
+    : {
+        sourceText: (args as LintHelperArgsForTextType).sourceText,
+      };
+
+  if (args.codeType === "appsync") {
+    //perform linting if the code is for AppSync
+    const result = await esLinting({
+      source: "appsync",
+      overrideEslintConfig: args.config.overrideEslintConfig,
+      debugSource: args.debugSource,
+      ...lintSourceConfig,
+    });
+
+    if (result !== false) {
+      const errorMessage = `The AppSync source file was not built successfully: ${args.debugSource}\n\n${result}\n\n`;
+      throw new Error(errorMessage);
+    }
+  } else {
+    const result = await esLinting({
+      source: "lambda",
+      overrideEslintConfig: args.config.overrideEslintConfig,
+      debugSource: args.debugSource,
+      ...lintSourceConfig,
+    });
+
+    if (result !== false) {
+      const errorMessage = `The Lambda source file was not built successfully: ${args.debugSource}\n\n${result}\n\n`;
+      throw new Error(errorMessage);
+    }
   }
 }
 
@@ -483,7 +678,8 @@ export async function inlineAppSyncCodeFromAssetHelper(
   )) as string;
 }
 
-export type OverridesConfigType = Linter.Config<
-  Linter.RulesRecord,
-  Linter.RulesRecord
->;
+export type OverridesConfigType =
+  | Linter.Config
+  | Linter.Config[]
+  | null
+  | undefined;
