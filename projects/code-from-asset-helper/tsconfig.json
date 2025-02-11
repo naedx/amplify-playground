@@ -1,16 +1,8 @@
 {
-  "extends": "@tsconfig/node20/tsconfig.json",
+  "extends": "@tsconfig/recommended/tsconfig.json",
   "include": ["**/*.ts", "**/*.mjs", "eslint.config.mjs"],
   "compilerOptions": {
-    "types": ["node"],
-    "target": "esnext",
-    "module": "esnext",
-    "moduleResolution": "bundler",
     "declaration": true,
-    "outDir": "./dist",
-    "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
-    "skipLibCheck": true
+    "outDir": "./dist"
   }
 }
