@@ -1,2 +1,5 @@
 dist
 tests/built-assets
+**/node_modules
+**/tests
+**/__snapshots__
