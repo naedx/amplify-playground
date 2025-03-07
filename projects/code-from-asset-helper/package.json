@@ -1,6 +1,6 @@
 {
   "name": "@amplify-playground/code-from-asset-helper",
-  "version": "2.0.0-alpha.5",
+  "version": "2.0.0-alpha.6",
   "description": "A helper to build, bundle and copy a lambda or AppSync function to the Amplify assets directory.",
   "main": "dist/index.js",
   "type": "commonjs",
@@ -55,9 +55,9 @@
   },
   "peerDependencies": {
     "@aws-appsync/eslint-plugin": "^2.0.1",
-    "aws-cdk-lib": "^2.177.0",
+    "aws-cdk-lib": "^2.178.1",
     "esbuild": "^0.24.2",
     "esbuild-plugin-eslint": "^0.3.12",
-    "eslint": "^9.19.0"
+    "eslint": "^9.20.1"
   }
 }
